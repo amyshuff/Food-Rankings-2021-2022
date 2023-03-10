@@ -1,0 +1,244 @@
+#PY22 food rankings (using 2021-2022 data)
+
+###### March 2023 Update ###### 
+# Last year the file "Sample Dataset Template_PY21 SNP Meals_ChildrenAtRisk_11152021"
+# outlined how the TDA data was manipulated in Excel before being imported into R.
+# The goal with this update is to do as much work as possible in R.
+
+
+
+#Only do this once:
+#install.packages("readxl")
+#install.packages("lettercase")
+
+library(tidyverse)
+library(janitor)
+library(reshape2)
+library(stringr)
+library(here)
+library(readxl)
+
+
+###### Harmony and Kipp Districts ######
+
+harmony <- c(101858, 101862, 71806, 15828, 161807, 101846, 227816) #use to combine Harmony districts
+kipp_data <- c(227820, 57837, 101813, 15826) #use to combine KIPP districts
+
+
+
+###### TEA Enrollment Data ######
+
+#TEA data is from Student Enrollment Reports, 2021-2022, Statewide District Totals, by Gender
+#https://rptsvr1.tea.texas.gov/adhocrpt/adste.html
+
+tea <- read.csv("Enrollment Report_Statewide_Districts_Gender_2021-2022.csv", skip = 4) %>%
+  mutate(ENROLLMENT = case_match(ENROLLMENT, 
+         #Small districts are masked with numbers like <10. Replace any masked numbers with an estimate.
+         #Instead of this method using case_match, we could use gsub to just remove the < character.
+                                 "<10" ~ "5",
+                                 "<20" ~ "10",
+                                 "<50" ~ "25",
+                                 .default = ENROLLMENT),
+        ENROLLMENT = as.numeric(ENROLLMENT)) %>% 
+    rename(District.Number = DISTRICT) %>% 
+    group_by(District.Number) %>% 
+    summarise(tea.all.stud = sum(ENROLLMENT))
+
+
+
+###### TDA SNP Data ######
+
+#Texas Department of Agriculture (TDA) School Nutrition Program (SNP) Data is from our public records request.
+#It comes in an excel sheet with multiple tabs. We'll import each of the tabs, select the variables we want to keep, then join them together.
+
+snp.contacts <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal Detail_01312023.xlsx"), sheet = 2) %>%
+  filter(TypeOfOrg == "Public") %>%
+  mutate(CEID = as.numeric(CEID),
+         SiteID = as.numeric(SiteID),
+         ESC.Region = as.numeric(ESC)) %>%
+  group_by(CEID, SiteID) %>%
+  rename(County = CECounty,
+        District = CountyDistrictCode) %>% 
+  select(CEID, SiteID, CEName, District, ESC.Region,
+         SchoolBreakfastProgram, NationalSchoolLunchProgram, AfterschoolCareProgram,
+         SevereNeedBreakfast, UniversalFreeBreakfast, AreaEligibleSnack, CEP, Provision2)
+
+#this tab has claims each month for each site
+#the work here represents what was done in excel last year
+snp.meal.reimb <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal Detail_01312023.xlsx"), sheet = 3) %>%
+  filter(TypeOfOrg == "Public") %>%
+  mutate(CEID = as.numeric(CEID),
+         SiteID = as.numeric(SiteID),
+         ESC.Region = as.numeric(ESC),
+         ClaimDate = as.character(ClaimDate),
+         
+         #tda notes say that they consider october the typical snapshot for the year
+         #this is what they did last year
+         # EnrollmentQty = ifelse(ClaimDate == "2021-10-01", EnrollmentQty, 0),
+         # FreeEligQty = ifelse(ClaimDate == "2021-10-01", FreeEligQty, 0),
+         # RedcEligQty = ifelse(ClaimDate == "2021-10-01", RedcEligQty, 0),
+         # PaidEligQty = ifelse(ClaimDate == "2021-10-01", PaidEligQty, 0)
+         #only 455 sites submitted claims for October, though
+         
+         ) %>% 
+  group_by(CEID, SiteID) %>%
+  summarise(
+        CEName = first(CEName),
+        County = first(CECounty),
+        District = first(CountyDistrictCode),
+        ESC.Region = first(ESC.Region),
+        
+        # this sum would find the october number, if we were using that method
+        # Enrollment_TDA = sum(EnrollmentQty, na.rm = T),
+        # Eligible.Free = sum(FreeEligQty, na.rm = T),
+        # Eligible.Reduced = sum(RedcEligQty, na.rm = T),
+        
+        #instead of summarizing down to the october claim amount, I'll instead find the maximum number of children enrolled for any claim
+        Enrollment_TDA = max(EnrollmentQty, na.rm = T),
+        Eligible.Free = max(FreeEligQty, na.rm = T),
+        Eligible.Reduced = max(RedcEligQty, na.rm = T),
+        #796 sites included this way
+    
+        #sums here represent site total for year
+        SBP.Days.Served = sum(BreakfastDays, na.rm = T),  
+        NSLP.Days.Served = sum(LunchDays, na.rm = T),
+        NSLP.Snack.Days.Served = sum(SnackDays, na.rm=T),
+        SBP.Free = sum(BreakfastServedFree, na.rm=T),    
+        SBP.Reduced = sum(BreakfastServedRedc, na.rm=T),   
+        NSLP.Free = sum(LunchServedFree, na.rm=T),
+        NSLP.Reduced = sum(LunchServedRedc, na.rm=T)
+        )
+
+snp <- full_join(snp.contacts, snp.meal.reimb, by = c("CEID", "SiteID", "CEName", "District", "ESC.Region"))
+
+
+#I don't think we use the cacfp contacts tab for anything
+#cacfp.contacts <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal Detail_01312023.xlsx"), sheet = 4)
+
+
+#need to find out how this is used. These sites aren't in the rest of our data.
+#District granted waiver from Senate Bill 376: Lists of CEs and sites approved to waive the Universal Breakfast requirement for PY22.
+#Before importing this data to R, manually check and add CEID and Site ID if not already in sheet
+#ub.waiver <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal Detail_01312023.xlsx"), sheet = 5) %>%
+#  rename(SiteID = "SITE ID", CEName = "CENAME") %>%
+#  mutate(CEID = as.numeric(CEID),
+#         SiteID = as.numeric(SiteID),
+#         UniversalBreakfastWaiver = "Y") %>% 
+#  select(CEID, SiteID, CEName, UniversalBreakfastWaiver)
+#snp.full <- full_join(snp, ub.waiver, by = c("CEID", "SiteID", "CEName"))
+#do we need to join it with the rest of our data?
+
+
+
+###### CACFP Data ######
+
+#cacfp data is from Texas Open Data Portal
+#Child and Adult Care Food Programs (CACFP) – At Risk– Meal Reimbursement – Program Year 2021-2022
+#https://data.texas.gov/dataset/Child-and-Adult-Care-Food-Programs-CACFP-At-Risk-M/e4wr-4i5j
+
+cacfp <- read.csv(here("Child_and_Adult_Care_Food_Programs__CACFP____At_Risk__Meal_Reimbursement___Program_Year_2021-2022.csv")) %>%
+#I found notes that the other data should be filtered by TypeofOrg = Public, so I'm assuming this should be filtered to Educational institutions
+  filter(TypeOfAgency == "Educational Institution") %>%
+  mutate(CEID = as.numeric(CEID),
+         SiteID = as.numeric(SiteID),
+         ESC.Region = as.numeric(ESC)) %>%
+  group_by(CEID, SiteID) %>%
+  summarise(CEName = first(CEName),
+            County = first(CECounty),
+            District = first(CountyDistrictCode),
+            ESC.Region = first(ESC.Region),        
+            #this file didn't have multiple claim dates, so the mean here doesn't actually do anything
+            CACFP.at.Risk.Supper.Days.Served = mean(SupperDays, na.rm=T),
+            CACFP.at.Risk.Snack.Days.Served = mean(SnackDays, na.rm=T))
+
+
+
+###### Aggregate school-level data up to district level ###### 
+
+district <- full_join(snp, cacfp, by=c("CEID", "SiteID", "CEName", "District", "ESC.Region", "County"))
+
+district$District = gsub("-", "", district$District)
+
+district <- district %>% 
+  mutate(District = as.numeric(District)) %>% 
+  mutate(
+          CEP01 = ifelse(CEP=="Y", 1, 0),
+          District.Number = ifelse(District %in% harmony, 227816,
+                                   ifelse(District %in% kipp_data, 227820, District))
+          ) %>% 
+  group_by(District.Number) %>% 
+  summarise(
+          CEName = first(CEName),
+          ####### Amy Bookmark: This is where I left off ######
+          #not every row has County, so I need a way to tell it to pick the first not NA value
+          #I'm assuming county will be important for quickly sorting by area for Houston, San Antonio, etc. area press conferences
+          County = first(County),
+          ESC.Region = first(ESC.Region),
+          Eligible.Free = sum(Eligible.Free, na.rm = T),
+          Enrollment_TDA = sum(Enrollment_TDA, na.rm = T),
+          Eligible.Reduced = sum(Eligible.Reduced, na.rm = T),
+          NSLP.Days.Served = first(NSLP.Days.Served),
+          NSLP.Free = sum(NSLP.Free, na.rm=T),
+          NSLP.Reduced = sum(NSLP.Reduced, na.rm=T),
+          SBP.Days.Served = first(SBP.Days.Served),
+          SBP.Free = sum(SBP.Free, na.rm=T),
+          SBP.Reduced = sum(SBP.Reduced, na.rm=T),
+          CACFP.at.Risk.Supper.Days.Served = mean(CACFP.at.Risk.Supper.Days.Served, na.rm=T),
+          CACFP.at.Risk.Snack.Days.Served = mean(CACFP.at.Risk.Snack.Days.Served, na.rm=T),
+          NSLP.Snack.Days.Served = mean(NSLP.Snack.Days.Served, na.rm=T),
+          CEP = mean(CEP01, na.rm=T)
+          ) %>%
+  full_join(., tea, by="District.Number") %>% 
+  mutate(
+          CEName = ifelse(District.Number==227820, "KIPP SCHOOLS", CEName),
+          #Eligible.Free and Eligible.Reduced are from the month with the greatest claims from schools
+          #but we only have claims for free or reduced from 129 districts
+          tda.frl.total = Eligible.Free + Eligible.Reduced,
+          
+          #some of the tda.ecodis.pct numbers are above 1, but I think that's because the tea enrollment numbers are probably not from the same month the max claims were made to tda
+          #so there's a small difference in the count of total students.
+          ###### Christine: help ######          
+          #this isn't a good way to find eco.dis.pct, since so many schools did not make claims to tda. We need to swap this out with the TEA numbers.
+          eco.dis.pct = (tda.frl.total/tea.all.stud)*100,
+          
+          CACFP.at.Risk.Supper.Days.Served = ifelse(is.nan(CACFP.at.Risk.Supper.Days.Served), 0, CACFP.at.Risk.Supper.Days.Served),
+          CACFP.at.Risk.Snack.Days.Served  = ifelse(is.nan(CACFP.at.Risk.Snack.Days.Served), 0, CACFP.at.Risk.Snack.Days.Served),
+          NSLP.Snack.Days.Served = ifelse(is.nan(NSLP.Snack.Days.Served), 0, NSLP.Snack.Days.Served),
+          NSLP.Days.Served = ifelse(is.na(NSLP.Days.Served), 0, NSLP.Days.Served),
+          SBP.Days.Served = ifelse(is.na(SBP.Days.Served), 0, SBP.Days.Served),
+        )
+
+district_rankings <- district %>% 
+  mutate(
+    Eligible.SBP.ADP = ifelse(SBP.Days.Served==0, 0, (SBP.Free + SBP.Reduced)/SBP.Days.Served),
+    Eligible.NSLP.ADP = ifelse(NSLP.Days.Served==0, 0, (NSLP.Free + NSLP.Reduced)/NSLP.Days.Served),
+    Pct.Eligible.SBP.Participation = (Eligible.SBP.ADP/tda.frl.total)*100,
+    Pct.Eligible.NSLP.Participation = (Eligible.NSLP.ADP/tda.frl.total)*100,
+    cacfp_supper01 = ifelse(CACFP.at.Risk.Supper.Days.Served>0, 100, 0),
+    snack_anyafter =  ifelse(CACFP.at.Risk.Snack.Days.Served>0 | NSLP.Snack.Days.Served>0, 100, 0),
+    #This is where we find our overall score for food rankings
+    district_sum = ((Pct.Eligible.NSLP.Participation*0.25)+(Pct.Eligible.SBP.Participation*0.5)+(cacfp_supper01*0.1)+(snack_anyafter*0.15))
+    ) %>% 
+  #remove any district that scored 0
+  filter(district_sum > 0) %>% 
+  arrange(-district_sum) %>% 
+  mutate(rank = row_number()) %>% 
+  select(CEName, rank, County, ESC.Region, tea.all.stud, eco.dis.pct, district_sum, Pct.Eligible.NSLP.Participation, 
+         Pct.Eligible.SBP.Participation, cacfp_supper01, snack_anyafter, CEP) %>%
+  mutate(cacfp_supper01 = ifelse(cacfp_supper01==100, "Yes", "No"),
+         snack_anyafter = ifelse(snack_anyafter==100, "Yes", "No"),
+         CEP = ifelse(CEP>0, "Yes", "No")) %>% 
+  reshape::rename(c(CEName = "District Name",
+                    rank = "Rank",
+                    tea.all.stud = "Total Enrollment",
+                    eco.dis.pct = "% Economically Disadvantaged",
+                    district_sum = "Overall Score",
+                    Pct.Eligible.NSLP.Participation = "% Lunch Participation",
+                    Pct.Eligible.SBP.Participation = "% Breakfast Participation",
+                    cacfp_supper01 = "CACFP Supper",
+                    snack_anyafter = "Afterschool Snack")) 
+#we only have 117 districts to rank
+#and this is before removing those that aren't 60% or more eco.dis or districts with low student populations
+
+
+write_csv(district_rankings, here("foodrankings_2021-2022.csv"))
