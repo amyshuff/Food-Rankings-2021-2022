@@ -9,8 +9,9 @@
 
 #Only do this once:
 #install.packages("readxl")
-#install.packages("lettercase")
 
+
+library(usethis)
 library(tidyverse)
 library(janitor)
 library(reshape2)
@@ -23,6 +24,20 @@ library(readxl)
 
 harmony <- c(101858, 101862, 71806, 15828, 161807, 101846, 227816) #use to combine Harmony districts
 kipp_data <- c(227820, 57837, 101813, 15826) #use to combine KIPP districts
+
+
+###### Texas Open Data Portal Data ######
+#https://data.texas.gov/stories/s/2021-2022-TDA-Food-and-Nutrition-Meals-Served-Dash/93tt-ffn6
+
+#2021-2022 Monthly School Meal Count
+#https://data.texas.gov/dataset/2021-2022-Monthly-School-Meal-Count/dyrd-amq2
+
+#Program should include both SEAMLESS_SUMMER_OPTION_MEALS and SCHOOL_NUTRITION_PROGRAM_MEALS
+#The Seamless Summer Option is what school used to provide free lunches for all students.
+#This is where the USDA nutrition waiver data was captured.
+
+#filter for TypeOfOrg = Public and program year
+
 
 
 
