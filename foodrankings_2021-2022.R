@@ -26,21 +26,6 @@ harmony <- c(101858, 101862, 71806, 15828, 161807, 101846, 227816) #use to combi
 kipp_data <- c(227820, 57837, 101813, 15826) #use to combine KIPP districts
 
 
-###### Texas Open Data Portal Data ######
-#https://data.texas.gov/stories/s/2021-2022-TDA-Food-and-Nutrition-Meals-Served-Dash/93tt-ffn6
-
-#2021-2022 Monthly School Meal Count
-#https://data.texas.gov/dataset/2021-2022-Monthly-School-Meal-Count/dyrd-amq2
-
-#Program should include both SEAMLESS_SUMMER_OPTION_MEALS and SCHOOL_NUTRITION_PROGRAM_MEALS
-#The Seamless Summer Option is what school used to provide free lunches for all students.
-#This is where the USDA nutrition waiver data was captured.
-
-#filter for TypeOfOrg = Public and program year
-
-
-
-
 ###### TEA Enrollment Data ######
 
 #TEA data is from Student Enrollment Reports, 2021-2022, Statewide District Totals, by Gender
@@ -65,6 +50,9 @@ tea <- read.csv("Enrollment Report_Statewide_Districts_Gender_2021-2022.csv", sk
 
 #Texas Department of Agriculture (TDA) School Nutrition Program (SNP) Data is from our public records request.
 #It comes in an excel sheet with multiple tabs. We'll import each of the tabs, select the variables we want to keep, then join them together.
+#This will probably look different next year. First check the Texas Open Data Portal for data before submitting records request.
+#Notes from last year say what two things still need to be requested.
+#https://data.texas.gov/stories/s/2021-2022-TDA-Food-and-Nutrition-Meals-Served-Dash/93tt-ffn6
 
 snp.contacts <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal Detail_01312023.xlsx"), sheet = 2) %>%
   filter(TypeOfOrg == "Public") %>%
@@ -108,7 +96,7 @@ snp.meal.reimb <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal 
         # Eligible.Free = sum(FreeEligQty, na.rm = T),
         # Eligible.Reduced = sum(RedcEligQty, na.rm = T),
         
-        #instead of summarizing down to the october claim amount, I'll instead find the maximum number of children enrolled for any claim
+        #instead of summarizing down to the october claim amount, I'll instead find the maximum number of children enrolled for any claim month
         Enrollment_TDA = max(EnrollmentQty, na.rm = T),
         Eligible.Free = max(FreeEligQty, na.rm = T),
         Eligible.Reduced = max(RedcEligQty, na.rm = T),
@@ -145,6 +133,34 @@ snp <- full_join(snp.contacts, snp.meal.reimb, by = c("CEID", "SiteID", "CEName"
 
 
 
+###### SSO Data ######
+
+#Seamless Summer Option (SSO) Data is from Texas Open Data Portal
+
+#2021-2022 Monthly SNP & SSO School Meal Count:
+#https://data.texas.gov/dataset/2021-2022-Monthly-School-Meal-Count/dyrd-amq2
+
+#The Seamless Summer Option is what schools used to provide free lunches for all students, regardless of income, throughout the  year.
+#This is where the USDA nutrition waiver data was captured.(This waiver has ended, so disregard this part next year.)
+
+sso <- read.csv("2021-2022_School_Meal_Count_-_TDA_F_N_Dashboard.csv") %>% 
+  filter(ProgramYear == "2021-2022",
+         TypeOfOrg == "Public",
+         Program == "SEAMLESS_SUMMER_OPTION_MEALS") %>% 
+  group_by(CEID, SiteID) %>%
+  summarise(
+        CEName = first(CEName),
+        County = first(CECounty),
+        District = first(CountyDistrictCode),
+        ESC.Region = first(ESC),
+        
+        #sums here represent site total for year
+        SSO.Breakfast.Days = sum(BreakfastDays, na.rm = T),  
+        SSO.Lunch.Days = sum(LunchDays, na.rm = T),
+        SSO.Snack.Days = sum(AMSnackDays + PMSnackDays, na.rm=T),
+        )
+
+
 ###### CACFP Data ######
 
 #cacfp data is from Texas Open Data Portal
@@ -170,7 +186,8 @@ cacfp <- read.csv(here("Child_and_Adult_Care_Food_Programs__CACFP____At_Risk__Me
 
 ###### Aggregate school-level data up to district level ###### 
 
-district <- full_join(snp, cacfp, by=c("CEID", "SiteID", "CEName", "District", "ESC.Region", "County"))
+district <- full_join(snp, cacfp, by=c("CEID", "SiteID", "CEName", "District", "ESC.Region", "County")) %>% 
+  full_join(sso, by=c("CEID", "SiteID", "CEName", "District", "ESC.Region", "County"))
 
 district$District = gsub("-", "", district$District)
 
@@ -184,10 +201,7 @@ district <- district %>%
   group_by(District.Number) %>% 
   summarise(
           CEName = first(CEName),
-          ####### Amy Bookmark: This is where I left off ######
-          #not every row has County, so I need a way to tell it to pick the first not NA value
-          #I'm assuming county will be important for quickly sorting by area for Houston, San Antonio, etc. area press conferences
-          County = first(County),
+          County = first(na.omit(County)),
           ESC.Region = first(ESC.Region),
           Eligible.Free = sum(Eligible.Free, na.rm = T),
           Enrollment_TDA = sum(Enrollment_TDA, na.rm = T),
@@ -202,6 +216,10 @@ district <- district %>%
           CACFP.at.Risk.Snack.Days.Served = mean(CACFP.at.Risk.Snack.Days.Served, na.rm=T),
           NSLP.Snack.Days.Served = mean(NSLP.Snack.Days.Served, na.rm=T),
           CEP = mean(CEP01, na.rm=T)
+          ####### Amy Bookmark: This is where I left off ######
+          #Need to add SSO Breakfast, lunch, and snack days here
+          #next, import tea eco dis number that christine sent
+          #after that, rework the participation rates by dividing by eco dis number instead of tda.frl.total
           ) %>%
   full_join(., tea, by="District.Number") %>% 
   mutate(
@@ -212,8 +230,6 @@ district <- district %>%
           
           #some of the tda.ecodis.pct numbers are above 1, but I think that's because the tea enrollment numbers are probably not from the same month the max claims were made to tda
           #so there's a small difference in the count of total students.
-          ###### Christine: help ######          
-          #this isn't a good way to find eco.dis.pct, since so many schools did not make claims to tda. We need to swap this out with the TEA numbers.
           eco.dis.pct = (tda.frl.total/tea.all.stud)*100,
           
           CACFP.at.Risk.Supper.Days.Served = ifelse(is.nan(CACFP.at.Risk.Supper.Days.Served), 0, CACFP.at.Risk.Supper.Days.Served),
