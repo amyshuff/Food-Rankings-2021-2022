@@ -26,23 +26,27 @@ harmony <- c(101858, 101862, 71806, 15828, 161807, 101846, 227816) #use to combi
 kipp_data <- c(227820, 57837, 101813, 15826) #use to combine KIPP districts
 
 
+
 ###### TEA Enrollment Data ######
+#This data is from the records request that we use for school rankings.
+#Total Enrollment Counts in Student Program and Special Populations Reports, PEIMS Data 2021-2022
 
-#TEA data is from Student Enrollment Reports, 2021-2022, Statewide District Totals, by Gender
-#https://rptsvr1.tea.texas.gov/adhocrpt/adste.html
+tea <- read_xlsx("pru_7128_StudPgmStateCampus22state.xlsx", skip = 6)
+  
+#Small enrollment numbers are masked with numbers like <10, so here we'll remove all the "<" characters.
+#Enrollment for small campuses will be an over estimate.
+tea$"ALL ENROLLMENT" =  gsub("<", "", tea$"ALL ENROLLMENT")
 
-tea <- read.csv("Enrollment Report_Statewide_Districts_Gender_2021-2022.csv", skip = 4) %>%
-  mutate(ENROLLMENT = case_match(ENROLLMENT, 
-         #Small districts are masked with numbers like <10. Replace any masked numbers with an estimate.
-         #Instead of this method using case_match, we could use gsub to just remove the < character.
-                                 "<10" ~ "5",
-                                 "<20" ~ "10",
-                                 "<50" ~ "25",
-                                 .default = ENROLLMENT),
-        ENROLLMENT = as.numeric(ENROLLMENT)) %>% 
-    rename(District.Number = DISTRICT) %>% 
-    group_by(District.Number) %>% 
-    summarise(tea.all.stud = sum(ENROLLMENT))
+tea <- tea %>% 
+  mutate(ENROLLMENT = as.numeric(tea$"ALL ENROLLMENT"),
+         #Economically disadvantaged numbers are masked with "-999"
+         eco.dis = ifelse(tea$"ECONOMICALLY DISADVANTAGED" >= 0, tea$"ECONOMICALLY DISADVANTAGED", NA)) %>%
+  rename(District.Number = "DISTRICT NUMBER") %>% 
+  group_by(District.Number) %>% 
+  summarise(tea.all.stud = sum(ENROLLMENT),
+            tea.eco.dis = sum(eco.dis, na.rm = T)) %>% 
+  mutate(eco.dis.pct = (tea.eco.dis/tea.all.stud)*100)
+
 
 
 
@@ -51,7 +55,7 @@ tea <- read.csv("Enrollment Report_Statewide_Districts_Gender_2021-2022.csv", sk
 #Texas Department of Agriculture (TDA) School Nutrition Program (SNP) Data is from our public records request.
 #It comes in an excel sheet with multiple tabs. We'll import each of the tabs, select the variables we want to keep, then join them together.
 #This will probably look different next year. First check the Texas Open Data Portal for data before submitting records request.
-#Notes from last year say what two things still need to be requested.
+#Notes from last year say that only the unviersal breakfast waiver information wasn't avaiable without PIR
 #https://data.texas.gov/stories/s/2021-2022-TDA-Food-and-Nutrition-Meals-Served-Dash/93tt-ffn6
 
 snp.contacts <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal Detail_01312023.xlsx"), sheet = 2) %>%
@@ -119,7 +123,7 @@ snp <- full_join(snp.contacts, snp.meal.reimb, by = c("CEID", "SiteID", "CEName"
 #cacfp.contacts <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal Detail_01312023.xlsx"), sheet = 4)
 
 
-#need to find out how this is used. These sites aren't in the rest of our data.
+#Not sure if we need this. These schools didn't serve universal breakfast even though they received money for free lunches.
 #District granted waiver from Senate Bill 376: Lists of CEs and sites approved to waive the Universal Breakfast requirement for PY22.
 #Before importing this data to R, manually check and add CEID and Site ID if not already in sheet
 #ub.waiver <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal Detail_01312023.xlsx"), sheet = 5) %>%
@@ -129,7 +133,6 @@ snp <- full_join(snp.contacts, snp.meal.reimb, by = c("CEID", "SiteID", "CEName"
 #         UniversalBreakfastWaiver = "Y") %>% 
 #  select(CEID, SiteID, CEName, UniversalBreakfastWaiver)
 #snp.full <- full_join(snp, ub.waiver, by = c("CEID", "SiteID", "CEName"))
-#do we need to join it with the rest of our data?
 
 
 
@@ -155,6 +158,8 @@ sso <- read.csv("2021-2022_School_Meal_Count_-_TDA_F_N_Dashboard.csv") %>%
         ESC.Region = first(ESC),
         
         #sums here represent site total for year
+        SSO.Breakfast = sum(BreakfastTotal, na.rm = T),  
+        SSO.Lunch = sum(LunchTotal, na.rm = T),
         SSO.Breakfast.Days = sum(BreakfastDays, na.rm = T),  
         SSO.Lunch.Days = sum(LunchDays, na.rm = T),
         SSO.Snack.Days = sum(AMSnackDays + PMSnackDays, na.rm=T),
@@ -168,7 +173,7 @@ sso <- read.csv("2021-2022_School_Meal_Count_-_TDA_F_N_Dashboard.csv") %>%
 #https://data.texas.gov/dataset/Child-and-Adult-Care-Food-Programs-CACFP-At-Risk-M/e4wr-4i5j
 
 cacfp <- read.csv(here("Child_and_Adult_Care_Food_Programs__CACFP____At_Risk__Meal_Reimbursement___Program_Year_2021-2022.csv")) %>%
-#I found notes that the other data should be filtered by TypeofOrg = Public, so I'm assuming this should be filtered to Educational institutions
+#I'm assuming this should be filtered to Educational institutions
   filter(TypeOfAgency == "Educational Institution") %>%
   mutate(CEID = as.numeric(CEID),
          SiteID = as.numeric(SiteID),
@@ -178,9 +183,8 @@ cacfp <- read.csv(here("Child_and_Adult_Care_Food_Programs__CACFP____At_Risk__Me
             County = first(CECounty),
             District = first(CountyDistrictCode),
             ESC.Region = first(ESC.Region),        
-            #this file didn't have multiple claim dates, so the mean here doesn't actually do anything
-            CACFP.at.Risk.Supper.Days.Served = mean(SupperDays, na.rm=T),
-            CACFP.at.Risk.Snack.Days.Served = mean(SnackDays, na.rm=T))
+            CACFP.at.Risk.Supper.Days.Served = sum(SupperDays, na.rm=T),
+            CACFP.at.Risk.Snack.Days.Served = sum(SnackDays, na.rm=T))
 
 
 
@@ -212,64 +216,76 @@ district <- district %>%
           SBP.Days.Served = first(SBP.Days.Served),
           SBP.Free = sum(SBP.Free, na.rm=T),
           SBP.Reduced = sum(SBP.Reduced, na.rm=T),
-          CACFP.at.Risk.Supper.Days.Served = mean(CACFP.at.Risk.Supper.Days.Served, na.rm=T),
-          CACFP.at.Risk.Snack.Days.Served = mean(CACFP.at.Risk.Snack.Days.Served, na.rm=T),
-          NSLP.Snack.Days.Served = mean(NSLP.Snack.Days.Served, na.rm=T),
-          CEP = mean(CEP01, na.rm=T)
-          ####### Amy Bookmark: This is where I left off ######
-          #Need to add SSO Breakfast, lunch, and snack days here
-          #next, import tea eco dis number that christine sent
-          #after that, rework the participation rates by dividing by eco dis number instead of tda.frl.total
+          CACFP.at.Risk.Supper.Days.Served = sum(CACFP.at.Risk.Supper.Days.Served, na.rm=T),
+          CACFP.at.Risk.Snack.Days.Served = sum(CACFP.at.Risk.Snack.Days.Served, na.rm=T),
+          NSLP.Snack.Days.Served = sum(NSLP.Snack.Days.Served, na.rm=T),
+          CEP = sum(CEP01, na.rm=T),
+
+          #Next year we don't need SSO numbers
+          SSO.Breakfast = sum(SSO.Breakfast, na.rm = T),  
+          SSO.Lunch = sum(SSO.Lunch, na.rm = T),
+          SSO.Breakfast.Days = sum(SSO.Breakfast.Days, na.rm = T),  
+          SSO.Lunch.Days = sum(SSO.Lunch.Days, na.rm = T),
+          SSO.Snack.Days = sum(SSO.Snack.Days, na.rm=T),    
           ) %>%
-  full_join(., tea, by="District.Number") %>% 
+  
+  left_join(., tea, by="District.Number") %>% 
   mutate(
           CEName = ifelse(District.Number==227820, "KIPP SCHOOLS", CEName),
           #Eligible.Free and Eligible.Reduced are from the month with the greatest claims from schools
-          #but we only have claims for free or reduced from 129 districts
+          #but we only have claims for free or reduced from 129 districts (next year use october numbers)
           tda.frl.total = Eligible.Free + Eligible.Reduced,
-          
-          #some of the tda.ecodis.pct numbers are above 1, but I think that's because the tea enrollment numbers are probably not from the same month the max claims were made to tda
-          #so there's a small difference in the count of total students.
-          eco.dis.pct = (tda.frl.total/tea.all.stud)*100,
-          
-          CACFP.at.Risk.Supper.Days.Served = ifelse(is.nan(CACFP.at.Risk.Supper.Days.Served), 0, CACFP.at.Risk.Supper.Days.Served),
-          CACFP.at.Risk.Snack.Days.Served  = ifelse(is.nan(CACFP.at.Risk.Snack.Days.Served), 0, CACFP.at.Risk.Snack.Days.Served),
-          NSLP.Snack.Days.Served = ifelse(is.nan(NSLP.Snack.Days.Served), 0, NSLP.Snack.Days.Served),
           NSLP.Days.Served = ifelse(is.na(NSLP.Days.Served), 0, NSLP.Days.Served),
           SBP.Days.Served = ifelse(is.na(SBP.Days.Served), 0, SBP.Days.Served),
-        )
+          
+          #don't need SSO next year
+          Breakfast.Served = SSO.Breakfast + SBP.Free + SBP.Reduced,
+          Breakfast.Days = SSO.Breakfast.Days + SBP.Days.Served,
+          Lunch.Served = SSO.Lunch + NSLP.Free + NSLP.Reduced,
+          Lunch.Days = SSO.Lunch.Days + NSLP.Days.Served,
+          Snack = SSO.Snack.Days + NSLP.Snack.Days.Served + CACFP.at.Risk.Snack.Days.Served,
+          
+          #ADP is Average Daily Participation: The average number of students that ate on days meals were offered.         
+          Free.Breakfast.ADP = ifelse(Breakfast.Days==0, 0, Breakfast.Served/Breakfast.Days),
+          Free.Lunch.ADP = ifelse(Lunch.Days==0, 0, (Lunch.Served/Lunch.Days)),
+          
+          #Participation Rates are the percent of students that ate
+          Pct.Free.Breakfast.Participation = (Free.Breakfast.ADP/tea.all.stud)*100,
+          Pct.Free.Lunch.Participation = (Free.Lunch.ADP/tea.all.stud)*100,
+          cacfp_supper01 = ifelse(CACFP.at.Risk.Supper.Days.Served>0, 100, 0),
+          snack_anyafter =  ifelse(CACFP.at.Risk.Snack.Days.Served>0 | NSLP.Snack.Days.Served>0, 100, 0)
+                )
+
+
+
+###### Rankings ######
 
 district_rankings <- district %>% 
-  mutate(
-    Eligible.SBP.ADP = ifelse(SBP.Days.Served==0, 0, (SBP.Free + SBP.Reduced)/SBP.Days.Served),
-    Eligible.NSLP.ADP = ifelse(NSLP.Days.Served==0, 0, (NSLP.Free + NSLP.Reduced)/NSLP.Days.Served),
-    Pct.Eligible.SBP.Participation = (Eligible.SBP.ADP/tda.frl.total)*100,
-    Pct.Eligible.NSLP.Participation = (Eligible.NSLP.ADP/tda.frl.total)*100,
-    cacfp_supper01 = ifelse(CACFP.at.Risk.Supper.Days.Served>0, 100, 0),
-    snack_anyafter =  ifelse(CACFP.at.Risk.Snack.Days.Served>0 | NSLP.Snack.Days.Served>0, 100, 0),
-    #This is where we find our overall score for food rankings
-    district_sum = ((Pct.Eligible.NSLP.Participation*0.25)+(Pct.Eligible.SBP.Participation*0.5)+(cacfp_supper01*0.1)+(snack_anyafter*0.15))
-    ) %>% 
-  #remove any district that scored 0
-  filter(district_sum > 0) %>% 
+  #remove small districts (less than 10,000 students) and those that aren't at least 60% economically disadvantaged
+  filter(tea.all.stud>=10000 & eco.dis.pct >= 60) %>% 
+  
+  #This is where we find our overall score for food rankings
+  district_sum = ((Pct.Free.Lunch.Participation*0.25)+(Pct.Free.Breakfast.Participation*0.5)+(cacfp_supper01*0.1)+(snack_anyafter*0.15)) %>% 
+  
   arrange(-district_sum) %>% 
-  mutate(rank = row_number()) %>% 
-  select(CEName, rank, County, ESC.Region, tea.all.stud, eco.dis.pct, district_sum, Pct.Eligible.NSLP.Participation, 
-         Pct.Eligible.SBP.Participation, cacfp_supper01, snack_anyafter, CEP) %>%
+  mutate(Rank = row_number()) %>% 
+  select(CEName, Rank, County, ESC.Region, tea.all.stud, eco.dis.pct, district_sum, Pct.Free.Lunch.Participation, 
+         Pct.Free.Breakfast.Participation, cacfp_supper01, snack_anyafter, CEP) %>%
   mutate(cacfp_supper01 = ifelse(cacfp_supper01==100, "Yes", "No"),
          snack_anyafter = ifelse(snack_anyafter==100, "Yes", "No"),
          CEP = ifelse(CEP>0, "Yes", "No")) %>% 
   reshape::rename(c(CEName = "District Name",
-                    rank = "Rank",
+                    ESC.Region = "ESC Region",
                     tea.all.stud = "Total Enrollment",
                     eco.dis.pct = "% Economically Disadvantaged",
                     district_sum = "Overall Score",
-                    Pct.Eligible.NSLP.Participation = "% Lunch Participation",
-                    Pct.Eligible.SBP.Participation = "% Breakfast Participation",
+                    Pct.Free.Lunch.Participation = "% Free Lunch Participation",
+                    Pct.Free.Breakfast.Participation = "% Free Breakfast Participation",
                     cacfp_supper01 = "CACFP Supper",
                     snack_anyafter = "Afterschool Snack")) 
-#we only have 117 districts to rank
-#and this is before removing those that aren't 60% or more eco.dis or districts with low student populations
-
 
 write_csv(district_rankings, here("foodrankings_2021-2022.csv"))
+
+
+####### Amy Bookmark: This is where I left off ######
+#The free lunch participation rates are looking really small considering the percent of economically disadvantaged students
