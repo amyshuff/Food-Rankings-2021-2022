@@ -55,7 +55,7 @@ tea <- tea %>%
 #Texas Department of Agriculture (TDA) School Nutrition Program (SNP) Data is from our public records request.
 #It comes in an excel sheet with multiple tabs. We'll import each of the tabs, select the variables we want to keep, then join them together.
 #This will probably look different next year. First check the Texas Open Data Portal for data before submitting records request.
-#Notes from last year say that only the unviersal breakfast waiver information wasn't avaiable without PIR
+#Notes from last year say that only the universal breakfast waiver information wasn't available without PIR
 #https://data.texas.gov/stories/s/2021-2022-TDA-Food-and-Nutrition-Meals-Served-Dash/93tt-ffn6
 
 snp.contacts <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal Detail_01312023.xlsx"), sheet = 2) %>%
@@ -100,20 +100,21 @@ snp.meal.reimb <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal 
         # Eligible.Free = sum(FreeEligQty, na.rm = T),
         # Eligible.Reduced = sum(RedcEligQty, na.rm = T),
         
-        #instead of summarizing down to the october claim amount, I'll instead find the maximum number of children enrolled for any claim month
-        Enrollment_TDA = max(EnrollmentQty, na.rm = T),
-        Eligible.Free = max(FreeEligQty, na.rm = T),
-        Eligible.Reduced = max(RedcEligQty, na.rm = T),
-        #796 sites included this way
-    
-        #sums here represent site total for year
-        SBP.Days.Served = sum(BreakfastDays, na.rm = T),  
-        NSLP.Days.Served = sum(LunchDays, na.rm = T),
+        # #sums here represent site total for year
+        
+        # SBP.Days.Served = sum(BreakfastDays, na.rm = T),  
+        # NSLP.Days.Served = sum(LunchDays, na.rm = T),
         NSLP.Snack.Days.Served = sum(SnackDays, na.rm=T),
-        SBP.Free = sum(BreakfastServedFree, na.rm=T),    
-        SBP.Reduced = sum(BreakfastServedRedc, na.rm=T),   
-        NSLP.Free = sum(LunchServedFree, na.rm=T),
-        NSLP.Reduced = sum(LunchServedRedc, na.rm=T)
+        # SBP.Free = sum(BreakfastServedFree, na.rm=T),    
+        # SBP.Reduced = sum(BreakfastServedRedc, na.rm=T),   
+        # NSLP.Free = sum(LunchServedFree, na.rm=T),
+        # NSLP.Reduced = sum(LunchServedRedc, na.rm=T),
+        
+        
+        #Because for this particular year everyone could get free meals, I'm assuming those eligible for paid meals still didn't pay.
+        #so I'm going to look at all meals, regardless of eligibility
+        NSLP.Total = sum(LunchTotal),
+        SBP.Total = sum(BreakfastTotal)
         )
 
 snp <- full_join(snp.contacts, snp.meal.reimb, by = c("CEID", "SiteID", "CEName", "District", "ESC.Region"))
@@ -207,19 +208,22 @@ district <- district %>%
           CEName = first(CEName),
           County = first(na.omit(County)),
           ESC.Region = first(ESC.Region),
-          Eligible.Free = sum(Eligible.Free, na.rm = T),
-          Enrollment_TDA = sum(Enrollment_TDA, na.rm = T),
-          Eligible.Reduced = sum(Eligible.Reduced, na.rm = T),
+          #Eligible.Free = sum(Eligible.Free, na.rm = T),
+          #Enrollment_TDA = sum(Enrollment_TDA, na.rm = T),
+          #Eligible.Reduced = sum(Eligible.Reduced, na.rm = T),
           NSLP.Days.Served = first(NSLP.Days.Served),
-          NSLP.Free = sum(NSLP.Free, na.rm=T),
-          NSLP.Reduced = sum(NSLP.Reduced, na.rm=T),
+          #NSLP.Free = sum(NSLP.Free, na.rm=T),
+          #NSLP.Reduced = sum(NSLP.Reduced, na.rm=T),
           SBP.Days.Served = first(SBP.Days.Served),
-          SBP.Free = sum(SBP.Free, na.rm=T),
-          SBP.Reduced = sum(SBP.Reduced, na.rm=T),
+          #SBP.Free = sum(SBP.Free, na.rm=T),
+          #SBP.Reduced = sum(SBP.Reduced, na.rm=T),
           CACFP.at.Risk.Supper.Days.Served = sum(CACFP.at.Risk.Supper.Days.Served, na.rm=T),
           CACFP.at.Risk.Snack.Days.Served = sum(CACFP.at.Risk.Snack.Days.Served, na.rm=T),
           NSLP.Snack.Days.Served = sum(NSLP.Snack.Days.Served, na.rm=T),
           CEP = sum(CEP01, na.rm=T),
+          
+          SBP.Total = sum(SBP.Total, na.rm=T),
+          NSLP.Total = sum(NSLP.Total, na.rm=T),
 
           #Next year we don't need SSO numbers
           SSO.Breakfast = sum(SSO.Breakfast, na.rm = T),  
@@ -234,26 +238,26 @@ district <- district %>%
           CEName = ifelse(District.Number==227820, "KIPP SCHOOLS", CEName),
           #Eligible.Free and Eligible.Reduced are from the month with the greatest claims from schools
           #but we only have claims for free or reduced from 129 districts (next year use october numbers)
-          tda.frl.total = Eligible.Free + Eligible.Reduced,
+          #tda.frl.total = Eligible.Free + Eligible.Reduced,
           NSLP.Days.Served = ifelse(is.na(NSLP.Days.Served), 0, NSLP.Days.Served),
           SBP.Days.Served = ifelse(is.na(SBP.Days.Served), 0, SBP.Days.Served),
           
-          #don't need SSO next year
-          Breakfast.Served = SSO.Breakfast + SBP.Free + SBP.Reduced,
+          #don't need SSO next year, and instead of total lunch and breakfast, use free and reduced instead
+          Breakfast.Served = SSO.Breakfast + SBP.Total,
           Breakfast.Days = SSO.Breakfast.Days + SBP.Days.Served,
-          Lunch.Served = SSO.Lunch + NSLP.Free + NSLP.Reduced,
+          Lunch.Served = SSO.Lunch + NSLP.Total,
           Lunch.Days = SSO.Lunch.Days + NSLP.Days.Served,
           Snack = SSO.Snack.Days + NSLP.Snack.Days.Served + CACFP.at.Risk.Snack.Days.Served,
           
           #ADP is Average Daily Participation: The average number of students that ate on days meals were offered.         
-          Free.Breakfast.ADP = ifelse(Breakfast.Days==0, 0, Breakfast.Served/Breakfast.Days),
-          Free.Lunch.ADP = ifelse(Lunch.Days==0, 0, (Lunch.Served/Lunch.Days)),
+          Breakfast.ADP = ifelse(Breakfast.Days==0, 0, Breakfast.Served/Breakfast.Days),
+          Lunch.ADP = ifelse(Lunch.Days==0, 0, (Lunch.Served/Lunch.Days)),
           
           #Participation Rates are the percent of students that ate
-          Pct.Free.Breakfast.Participation = (Free.Breakfast.ADP/tea.all.stud)*100,
-          Pct.Free.Lunch.Participation = (Free.Lunch.ADP/tea.all.stud)*100,
+          Pct.Breakfast.Participation = (Breakfast.ADP/tea.all.stud)*100,
+          Pct.Lunch.Participation = (Lunch.ADP/tea.all.stud)*100,
           cacfp_supper01 = ifelse(CACFP.at.Risk.Supper.Days.Served>0, 100, 0),
-          snack_anyafter =  ifelse(CACFP.at.Risk.Snack.Days.Served>0 | NSLP.Snack.Days.Served>0, 100, 0)
+          snack_anyafter =  ifelse(Snack>0, 100, 0)
                 )
 
 
@@ -265,12 +269,12 @@ district_rankings <- district %>%
   filter(tea.all.stud>=10000 & eco.dis.pct >= 60) %>% 
   
   #This is where we find our overall score for food rankings
-  district_sum = ((Pct.Free.Lunch.Participation*0.25)+(Pct.Free.Breakfast.Participation*0.5)+(cacfp_supper01*0.1)+(snack_anyafter*0.15)) %>% 
+  mutate(district_sum = ((Pct.Lunch.Participation*0.25)+(Pct.Breakfast.Participation*0.5)+(cacfp_supper01*0.1)+(snack_anyafter*0.15))) %>% 
   
   arrange(-district_sum) %>% 
   mutate(Rank = row_number()) %>% 
-  select(CEName, Rank, County, ESC.Region, tea.all.stud, eco.dis.pct, district_sum, Pct.Free.Lunch.Participation, 
-         Pct.Free.Breakfast.Participation, cacfp_supper01, snack_anyafter, CEP) %>%
+  select(CEName, Rank, County, ESC.Region, tea.all.stud, eco.dis.pct, district_sum, Pct.Lunch.Participation, 
+         Pct.Breakfast.Participation, cacfp_supper01, snack_anyafter, CEP) %>%
   mutate(cacfp_supper01 = ifelse(cacfp_supper01==100, "Yes", "No"),
          snack_anyafter = ifelse(snack_anyafter==100, "Yes", "No"),
          CEP = ifelse(CEP>0, "Yes", "No")) %>% 
@@ -279,8 +283,8 @@ district_rankings <- district %>%
                     tea.all.stud = "Total Enrollment",
                     eco.dis.pct = "% Economically Disadvantaged",
                     district_sum = "Overall Score",
-                    Pct.Free.Lunch.Participation = "% Free Lunch Participation",
-                    Pct.Free.Breakfast.Participation = "% Free Breakfast Participation",
+                    Pct.Lunch.Participation = "% Lunch Participation",
+                    Pct.Breakfast.Participation = "% Breakfast Participation",
                     cacfp_supper01 = "CACFP Supper",
                     snack_anyafter = "Afterschool Snack")) 
 
