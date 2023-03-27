@@ -59,7 +59,7 @@ tea <- tea %>%
 #https://data.texas.gov/stories/s/2021-2022-TDA-Food-and-Nutrition-Meals-Served-Dash/93tt-ffn6
 
 snp.contacts <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal Detail_01312023.xlsx"), sheet = 2) %>%
-  filter(TypeOfOrg == "Public") %>%
+#  filter(TypeOfOrg == "Public") %>%
   mutate(CEID = as.numeric(CEID),
          SiteID = as.numeric(SiteID),
          ESC.Region = as.numeric(ESC)) %>%
@@ -73,7 +73,7 @@ snp.contacts <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal De
 #this tab has claims each month for each site
 #the work here represents what was done in excel last year
 snp.meal.reimb <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal Detail_01312023.xlsx"), sheet = 3) %>%
-  filter(TypeOfOrg == "Public") %>%
+#  filter(TypeOfOrg == "Public") %>%
   mutate(CEID = as.numeric(CEID),
          SiteID = as.numeric(SiteID),
          ESC.Region = as.numeric(ESC),
@@ -102,8 +102,8 @@ snp.meal.reimb <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal 
         
         # #sums here represent site total for year
         
-        # SBP.Days.Served = sum(BreakfastDays, na.rm = T),  
-        # NSLP.Days.Served = sum(LunchDays, na.rm = T),
+        SBP.Days.Served = sum(BreakfastDays, na.rm = T),  
+        NSLP.Days.Served = sum(LunchDays, na.rm = T),
         NSLP.Snack.Days.Served = sum(SnackDays, na.rm=T),
         # SBP.Free = sum(BreakfastServedFree, na.rm=T),    
         # SBP.Reduced = sum(BreakfastServedRedc, na.rm=T),   
@@ -149,7 +149,7 @@ snp <- full_join(snp.contacts, snp.meal.reimb, by = c("CEID", "SiteID", "CEName"
 
 sso <- read.csv("2021-2022_School_Meal_Count_-_TDA_F_N_Dashboard.csv") %>% 
   filter(ProgramYear == "2021-2022",
-         TypeOfOrg == "Public",
+#         TypeOfOrg == "Public",
          Program == "SEAMLESS_SUMMER_OPTION_MEALS") %>% 
   group_by(CEID, SiteID) %>%
   summarise(
@@ -174,8 +174,7 @@ sso <- read.csv("2021-2022_School_Meal_Count_-_TDA_F_N_Dashboard.csv") %>%
 #https://data.texas.gov/dataset/Child-and-Adult-Care-Food-Programs-CACFP-At-Risk-M/e4wr-4i5j
 
 cacfp <- read.csv(here("Child_and_Adult_Care_Food_Programs__CACFP____At_Risk__Meal_Reimbursement___Program_Year_2021-2022.csv")) %>%
-#I'm assuming this should be filtered to Educational institutions
-  filter(TypeOfAgency == "Educational Institution") %>%
+#  filter(TypeOfAgency == "Educational Institution") %>%
   mutate(CEID = as.numeric(CEID),
          SiteID = as.numeric(SiteID),
          ESC.Region = as.numeric(ESC)) %>%
@@ -211,10 +210,10 @@ district <- district %>%
           #Eligible.Free = sum(Eligible.Free, na.rm = T),
           #Enrollment_TDA = sum(Enrollment_TDA, na.rm = T),
           #Eligible.Reduced = sum(Eligible.Reduced, na.rm = T),
-          NSLP.Days.Served = first(NSLP.Days.Served),
+          NSLP.Days.Served = max(NSLP.Days.Served, 0, na.rm = T),
           #NSLP.Free = sum(NSLP.Free, na.rm=T),
           #NSLP.Reduced = sum(NSLP.Reduced, na.rm=T),
-          SBP.Days.Served = first(SBP.Days.Served),
+          SBP.Days.Served = max(SBP.Days.Served, 0, na.rm = T),
           #SBP.Free = sum(SBP.Free, na.rm=T),
           #SBP.Reduced = sum(SBP.Reduced, na.rm=T),
           CACFP.at.Risk.Supper.Days.Served = sum(CACFP.at.Risk.Supper.Days.Served, na.rm=T),
@@ -228,21 +227,23 @@ district <- district %>%
           #Next year we don't need SSO numbers
           SSO.Breakfast = sum(SSO.Breakfast, na.rm = T),  
           SSO.Lunch = sum(SSO.Lunch, na.rm = T),
-          SSO.Breakfast.Days = sum(SSO.Breakfast.Days, na.rm = T),  
-          SSO.Lunch.Days = sum(SSO.Lunch.Days, na.rm = T),
-          SSO.Snack.Days = sum(SSO.Snack.Days, na.rm=T),    
+          SSO.Breakfast.Days = max(SSO.Breakfast.Days, 0, na.rm = T),
+          SSO.Lunch.Days = max(SSO.Lunch.Days, 0, na.rm = T),
+          SSO.Snack.Days = max(SSO.Snack.Days, 0, na.rm = T)    
           ) %>%
+  
+#  replace(is.na(.), 0) %>% 
   
   left_join(., tea, by="District.Number") %>% 
   mutate(
           CEName = ifelse(District.Number==227820, "KIPP SCHOOLS", CEName),
           #Eligible.Free and Eligible.Reduced are from the month with the greatest claims from schools
-          #but we only have claims for free or reduced from 129 districts (next year use october numbers)
+          #next year use october numbers
           #tda.frl.total = Eligible.Free + Eligible.Reduced,
-          NSLP.Days.Served = ifelse(is.na(NSLP.Days.Served), 0, NSLP.Days.Served),
-          SBP.Days.Served = ifelse(is.na(SBP.Days.Served), 0, SBP.Days.Served),
+         # NSLP.Days.Served = ifelse(is.na(NSLP.Days.Served), 0, NSLP.Days.Served),
+         # SBP.Days.Served = ifelse(is.na(SBP.Days.Served), 0, SBP.Days.Served),
           
-          #don't need SSO next year, and instead of total lunch and breakfast, use free and reduced instead
+          #don't need SSO next year, and instead of total, use free and reduced instead
           Breakfast.Served = SSO.Breakfast + SBP.Total,
           Breakfast.Days = SSO.Breakfast.Days + SBP.Days.Served,
           Lunch.Served = SSO.Lunch + NSLP.Total,
@@ -289,7 +290,3 @@ district_rankings <- district %>%
                     snack_anyafter = "Afterschool Snack")) 
 
 write_csv(district_rankings, here("foodrankings_2021-2022.csv"))
-
-
-####### Amy Bookmark: This is where I left off ######
-#The free lunch participation rates are looking really small considering the percent of economically disadvantaged students
