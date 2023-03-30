@@ -1,5 +1,6 @@
 ---
-title: "foodrankings_2021-2022"
+title: "Food Rankings 2023"
+author: "Amy Shuff"
 output: word_document
 date: '`r Sys.Date()`'
 ---
@@ -8,11 +9,14 @@ date: '`r Sys.Date()`'
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# March 2023 Update
-PY22 food rankings (using 2021-2022 data)
-Last year the file "Sample Dataset Template_PY21 SNP Meals_ChildrenAtRisk_11152021" outlined how the TDA data was manipulated in Excel before being imported into R. The goal with this update is to do as much work as possible in R.
+
+Our 2023 Food Rankings analyze data from the 2022 Program Year (2021-2022 data).
+
 
 ``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
+# March 2023 Update
+# Last year the file "Sample Dataset Template_PY21 SNP Meals_ChildrenAtRisk_11152021" outlined how the TDA data was manipulated in Excel before being imported into R. The goal with this update is to do as much work as possible in R.
+
 library(usethis)
 library(tidyverse)
 library(janitor)
@@ -22,9 +26,11 @@ library(here)
 library(readxl)
 ```
 
-# Harmony and Kipp Districts
+# Data Sources
 
-Explain here why we have to combine harmony and kipp districts.
+## Harmony and Kipp Districts
+
+Explain here why we have to combine harmony and kipp districts. Or maybe this should go someplace else?
 
 ```{r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
 harmony <- c(101858, 101862, 71806, 15828, 161807, 101846, 227816) #use to combine Harmony districts
@@ -32,11 +38,23 @@ kipp_data <- c(227820, 57837, 101813, 15826) #use to combine KIPP districts
 
 ```
 
-# TEA Enrollment Data
-This data is from the records request that we use for school rankings.
+## Texas Education Agency (TEA)
+
 Total Enrollment Counts in Student Program and Special Populations Reports, PEIMS Data 2021-2022
 
+TEA data was obtained via Public Records Request. From this data we use the student enrollment counts and economically disadvantaged counts.
+
+Student enrollment for small campuses are masked. In the case of the reported number being <10, we use 10.
+This means our district student counts are a slight overestimate.
+
+Economically disadvantaged counts are sometimes unavailable, so in that case they are assumed zero.
+
+Percent economically disadvantaged for each district is calculated from the campus counts.
+
 ``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
+
+#This is something we request for the school rankings.
+
 tea <- read_xlsx("pru_7128_StudPgmStateCampus22state.xlsx", skip = 6)
   
 #Small enrollment numbers are masked with numbers like <10, so here we'll remove all the "<" characters.
@@ -56,15 +74,26 @@ tea <- tea %>%
 
 
 
-# TDA SNP Data
+## Texas Department of Agriculture (TDA)
 
-Texas Department of Agriculture (TDA) School Nutrition Program (SNP) Data is from our public records request.
-It comes in an excel sheet with multiple tabs. We'll import each of the tabs, select the variables we want to keep, then join them together.
-This will probably look different next year. First check the Texas Open Data Portal for data before submitting records request.
-Notes from last year say that only the universal breakfast waiver information wasn't available without PIR
-https://data.texas.gov/stories/s/2021-2022-TDA-Food-and-Nutrition-Meals-Served-Dash/93tt-ffn6
+Although we obtained our data from a public information request, it is also available on the Food and Nutrition Meals Served Dashboard, 2021-2022: https://data.texas.gov/stories/s/2021-2022-TDA-Food-and-Nutrition-Meals-Served-Dash/93tt-ffn6
+
+### School Nutrition Program (SNP)
+
+SNP Data includes meal counts from the National School Lunch Program (NSLP) and the School Breakfast Program (SBP).
+
+Credit for participating in the Community Eligible Provision (CEP) was given to the entire district if they had any participating location.
+
 
 ``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
+
+# This year TDA School Nutrition Program Data is from our public records request.
+# It comes in an excel sheet with multiple tabs. We'll import each of the tabs, select the variables we want to keep, then join them together.
+# This will probably look different next year. First check the Texas Open Data Portal for data before submitting records request.
+# Notes from last year say that only the universal breakfast waiver information wasn't available without PIR
+# Use this link to look for next year's data: https://data.texas.gov/stories/s/e2dm-5r4v
+
+# Contacts and Participation has CEP data
 snp.contacts <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal Detail_01312023.xlsx"), sheet = 2) %>%
   mutate(CEID = as.numeric(CEID),
          SiteID = as.numeric(SiteID),
@@ -76,6 +105,7 @@ snp.contacts <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal De
          SchoolBreakfastProgram, NationalSchoolLunchProgram, AfterschoolCareProgram,
          SevereNeedBreakfast, UniversalFreeBreakfast, AreaEligibleSnack, CEP, Provision2)
 
+#Meal Reimbursement Claims has the number of meals served
 #this tab has claims each month for each site
 #the work here represents what was done in excel last year
 snp.meal.reimb <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal Detail_01312023.xlsx"), sheet = 3) %>%
@@ -105,7 +135,7 @@ snp.meal.reimb <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal 
         # Eligible.Free = sum(FreeEligQty, na.rm = T),
         # Eligible.Reduced = sum(RedcEligQty, na.rm = T),
         
-        # #sums here represent site total for year
+        # sums here represent site total for year
         
         SBP.Days.Served = sum(BreakfastDays, na.rm = T),  
         NSLP.Days.Served = sum(LunchDays, na.rm = T),
@@ -144,17 +174,23 @@ snp <- full_join(snp.contacts, snp.meal.reimb, by = c("CEID", "SiteID", "CEName"
 
 
 
-# SSO Data
+### Seamless Summer Option (SSO)
 
-Seamless Summer Option (SSO) Data is from Texas Open Data Portal
+SSO data was obtained from the TDA F&N Meals Served Dashboard.
 
 2021-2022 Monthly SNP & SSO School Meal Count:
 https://data.texas.gov/dataset/2021-2022-Monthly-School-Meal-Count/dyrd-amq2
 
-The Seamless Summer Option is what schools used to provide free lunches for all students, regardless of income, throughout the  year.
-This is where the USDA nutrition waiver data was captured.(This waiver has ended, so disregard this part next year.)
+Note from the data dashboard:
+"In March 2020, USDA began allowing flexibility in nutrition assistance program policies to support continued meal access during the coronavirus pandemic (COVID-19). This included offering School Nutrition Program sponsors the option to provide meals through Seamless Summer Option (SSO) in program year 2021-2022." 
+
+The SSO is what schools used to offer free meals to all students regardless of income. Because of this, we are choosing to look at total number of meals served instead of only the free and reduced as we've done in years past. This option will not be available next year because the program has ended. 
+
 
 ``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
+
+#This waiver has ended, so disregard this part next year.
+
 sso <- read.csv("2021-2022_School_Meal_Count_-_TDA_F_N_Dashboard.csv") %>% 
   filter(ProgramYear == "2021-2022",
          Program == "SEAMLESS_SUMMER_OPTION_MEALS") %>% 
@@ -174,13 +210,18 @@ sso <- read.csv("2021-2022_School_Meal_Count_-_TDA_F_N_Dashboard.csv") %>%
         )
 ```
 
-# CACFP Data
+### Child and Adult Care Food Program (CACFP)
 
-cacfp data is from Texas Open Data Portal
-Child and Adult Care Food Programs (CACFP) – At Risk– Meal Reimbursement – Program Year 2021-2022
+Child and Adult Care Food Programs (CACFP) – At Risk– Meal Reimbursement – Program Year 2021-2022:
 https://data.texas.gov/dataset/Child-and-Adult-Care-Food-Programs-CACFP-At-Risk-M/e4wr-4i5j
 
+CACFP data captures meals served in At-Risk afterschool care centers.
+
 ``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
+#Next year, use this link: https://data.texas.gov/stories/s/iekx-7mdi
+#and scroll down to CACFP At-Risk Child Care Claims
+
+
 cacfp <- read.csv(here("Child_and_Adult_Care_Food_Programs__CACFP____At_Risk__Meal_Reimbursement___Program_Year_2021-2022.csv")) %>%
   mutate(CEID = as.numeric(CEID),
          SiteID = as.numeric(SiteID),
