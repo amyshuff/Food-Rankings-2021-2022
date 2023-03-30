@@ -1,5 +1,5 @@
 ---
-title: "Food Rankings 2023"
+title: "2023 Food Rankings"
 author: "Amy Shuff"
 output: word_document
 date: '`r Sys.Date()`'
@@ -12,6 +12,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Our 2023 Food Rankings analyze data from the 2022 Program Year (2021-2022 data).
 
+The code used to create our rankings is available to the public on github: https://github.com/amyshuff/Food-Rankings-2021-2022
+
+\
 
 ``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
 # March 2023 Update
@@ -28,16 +31,6 @@ library(readxl)
 
 # Data Sources
 
-## Harmony and Kipp Districts
-
-Explain here why we have to combine harmony and kipp districts. Or maybe this should go someplace else?
-
-```{r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
-harmony <- c(101858, 101862, 71806, 15828, 161807, 101846, 227816) #use to combine Harmony districts
-kipp_data <- c(227820, 57837, 101813, 15826) #use to combine KIPP districts
-
-```
-
 ## Texas Education Agency (TEA)
 
 Total Enrollment Counts in Student Program and Special Populations Reports, PEIMS Data 2021-2022
@@ -49,7 +42,7 @@ This means our district student counts are a slight overestimate.
 
 Economically disadvantaged counts are sometimes unavailable, so in that case they are assumed zero.
 
-Percent economically disadvantaged for each district is calculated from the campus counts.
+Percent economically disadvantaged for each district is calculated from the campus student counts.
 
 ``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
 
@@ -72,7 +65,7 @@ tea <- tea %>%
   mutate(eco.dis.pct = (tea.eco.dis/tea.all.stud)*100)
 ```
 
-
+\
 
 ## Texas Department of Agriculture (TDA)
 
@@ -215,7 +208,7 @@ sso <- read.csv("2021-2022_School_Meal_Count_-_TDA_F_N_Dashboard.csv") %>%
 Child and Adult Care Food Programs (CACFP) – At Risk– Meal Reimbursement – Program Year 2021-2022:
 https://data.texas.gov/dataset/Child-and-Adult-Care-Food-Programs-CACFP-At-Risk-M/e4wr-4i5j
 
-CACFP data captures meals served in At-Risk afterschool care centers.
+CACFP data captures meals (supper) served in At-Risk afterschool care centers.
 
 ``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
 #Next year, use this link: https://data.texas.gov/stories/s/iekx-7mdi
@@ -235,10 +228,31 @@ cacfp <- read.csv(here("Child_and_Adult_Care_Food_Programs__CACFP____At_Risk__Me
             CACFP.at.Risk.Snack.Days.Served = sum(SnackDays, na.rm=T))
 ```
 
+\
 
 
+# Analysis
 
-# Aggregate school-level data up to district level
+
+## Harmony Districts
+
+Harmony Public Schools are listed under multiple district numbers (101858, 101862, 71806, 15828, 161807, 101846, 227816) in both the TEA and TDA data, but we combine them and consider them as a single district.
+
+
+```{r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
+
+
+harmony <- c(101858, 101862, 71806, 15828, 161807, 101846, 227816) #use to combine Harmony districts
+kipp_data <- c(227820, 57837, 101813, 15826) #use to combine KIPP districts
+
+#I couldn't find 57837, 101813, or 15826 in our data, so this kipp dataset doesn't do anything. Leaving it here just in case we need it in future years.
+
+```
+
+## Aggregate data up to district level
+
+TDA data is reported monthly by Contracting Entities (CE) and participating sites. Usually October is used as the snapshot claim month for the year. This year fewer sites reported to TDA, and those that did didn't report every month, instead favoring SSO for meal reimbursement, so we used their maximum claim month for the year instead.
+
 
 ``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
 district <- full_join(snp, cacfp, by=c("CEID", "SiteID", "CEName", "District", "ESC.Region", "County")) %>% 
@@ -309,10 +323,30 @@ district <- district %>%
           cacfp_supper01 = ifelse(CACFP.at.Risk.Supper.Days.Served>0, 100, 0),
           snack_anyafter =  ifelse(Snack>0, 100, 0)
                 )
+
+#In previous years, we've found participation rates by dividing the number of free and reduced meals by the students that were eligible for them.
+#We chose to do all meals for all students this year, since everyone was eligible for free meals under SSO.
+
 ```
 
+Breakfast and lunch average daily participation (ADP) rates were found by dividing all meals served by the number of days meals were served.
 
-# Overall Rankings
+Then the percent of breakfast and lunch participation was found by dividing their respective ADPs by the total number of students, as reported by the TEA data.
+
+Our previous rankings found the percent of breakfast and lunch participation by dividing the free and reduced meals by the students that were eligible for them. We are looking at all meals for all students this year, since everyone was eligible for a free meal with SSO.
+
+Credit for supper and snacks was given if any were offered by any site in the district at any point in the year.
+
+
+## Overall Rankings
+
+District scores were calculated as follows:\
+  25% percent of lunch participation\
+  50% percent of Breakfast participation\
+  10% serving supper\
+  15% serving after school snacks
+
+We only include districts that have at least 1,000 students and at least 60% economically disadvantaged student population.
 
 ``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
 district_rankings <- district %>% 
@@ -344,8 +378,9 @@ write_csv(district_rankings, here("foodrankings_PY22_10k.csv"))
 ```
 
 
-# Large districts, 50k or more
-Creates same table as before but with 50K or more students
+## Large districts
+Districts are considered large if they have at least 50,000 students.
+
 ``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
 district_50k <- district %>% 
   filter(tea.all.stud>=50000 & eco.dis.pct >= 60) %>% 
@@ -371,8 +406,9 @@ district_50k <- district %>%
 write_csv(district_50k, here("foodrankings_PY22_50k.csv"))
 ```
 
-# Middle-income districts (60-70% Eco Dis)
-takes out high poverty schools and focuses on those which often face more challenges in implementing school food programs to scale
+## Middle-income districts
+Districts are considered middle-income if they have 60-70% economically disadvantaged student population. This takes out high poverty schools and focuses on those which often face more challenges in implementing school food programs to scale.
+
 ``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
 district_middleincome <- district %>% 
   filter(tea.all.stud>=10000 & eco.dis.pct >= 60 & eco.dis.pct <=70) %>% 
@@ -397,3 +433,24 @@ district_middleincome <- district %>%
 
 write_csv(district_middleincome, here("foodrankings_PY22_middleincome.csv"))
 ```
+
+\
+
+# Key Take-Aways
+
+`r sum(tea$tea.all.stud, na.rm = T)` number of students that qualify for free meals
+
+top ranking districts participation rates
+
+lowest ranking districts participation rates
+
+Top 10 school districts overall
+
+top 5 large school districts
+
+top 5 middle-income school districts
+
+district with the highest lunch participation
+district with the highest breakfast participation
+
+percent of districts that participate in the CACFP after-school meal program
