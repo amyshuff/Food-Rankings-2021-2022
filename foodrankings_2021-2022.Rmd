@@ -3,9 +3,9 @@ title: "2023 Food Rankings"
 author: "Amy Shuff"
 date: "`r Sys.Date()`"
 output:
-  word_document: default
   html_document:
     df_print: paged
+  word_document: default
   pdf_document: default
 ---
 
@@ -74,9 +74,10 @@ tea <- tea %>%
 
 ## Texas Department of Agriculture (TDA)
 
-* Although we obtained our data from a public information request, it is also available on the [Food and Nutrition Meals Served Dashboard, 2021-2022](https://data.texas.gov/stories/s/2021-2022-TDA-Food-and-Nutrition-Meals-Served-Dash/93tt-ffn6).
 
 ### School Nutrition Program (SNP)
+
+* Although we obtained our data from a public information request, it is also available on the [Food and Nutrition Meals Served Dashboard, 2021-2022](https://data.texas.gov/stories/s/2021-2022-TDA-Food-and-Nutrition-Meals-Served-Dash/93tt-ffn6)
 
 SNP Data includes meal counts from the National School Lunch Program (NSLP) and the School Breakfast Program (SBP).
 
@@ -464,9 +465,9 @@ my_kable(district_middleincome, 5, caption="Top 5 Middle-income Districts", form
 
 All 5,429,895 students in Texas were offered free meals this year.
 
-The top ranking districts all had over 70% of their student population participating in lunch.
+The top ranking districts all had over 70% of their student population participating in lunch
 
-Even the lowest ranked district had `r min(district_rankings$"% Lunch Participation")`% of their student population participating in lunch.
+Even the lowest ranked district had `r min(district_rankings$"% Lunch Participation")`% of their student population participating in lunch
 
 Top 10 school districts overall: Donna ISD, IDEA Academy, McAllen ISD, Harlandale ISD, Clint ISD, La Joya ISD, Eagle Pass ISD, Edinburg ISD, San Antonio ISD, Harlingen Consolidated ISD
 
