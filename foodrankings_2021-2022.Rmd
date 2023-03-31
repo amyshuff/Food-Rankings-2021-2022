@@ -12,13 +12,14 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Our 2023 Food Rankings analyze data from the 2022 Program Year (2021-2022 data).
 
-The code used to create our rankings is available to the public on github: https://github.com/amyshuff/Food-Rankings-2021-2022
+The code used to create our rankings is available to the public on [github]( https://github.com/amyshuff/Food-Rankings-2021-2022).
 
 \
 
 ``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
 # March 2023 Update
 # Last year the file "Sample Dataset Template_PY21 SNP Meals_ChildrenAtRisk_11152021" outlined how the TDA data was manipulated in Excel before being imported into R. The goal with this update is to do as much work as possible in R.
+
 
 library(usethis)
 library(tidyverse)
@@ -33,7 +34,7 @@ library(readxl)
 
 ## Texas Education Agency (TEA)
 
-Total Enrollment Counts in Student Program and Special Populations Reports, PEIMS Data 2021-2022
+* Total Enrollment Counts in Student Program and Special Populations Reports, PEIMS Data 2021-2022
 
 TEA data was obtained via Public Records Request. From this data we use the student enrollment counts and economically disadvantaged counts.
 
@@ -69,7 +70,7 @@ tea <- tea %>%
 
 ## Texas Department of Agriculture (TDA)
 
-Although we obtained our data from a public information request, it is also available on the Food and Nutrition Meals Served Dashboard, 2021-2022: https://data.texas.gov/stories/s/2021-2022-TDA-Food-and-Nutrition-Meals-Served-Dash/93tt-ffn6
+* Although we obtained our data from a public information request, it is also available on the [Food and Nutrition Meals Served Dashboard, 2021-2022](https://data.texas.gov/stories/s/2021-2022-TDA-Food-and-Nutrition-Meals-Served-Dash/93tt-ffn6).
 
 ### School Nutrition Program (SNP)
 
@@ -171,8 +172,7 @@ snp <- full_join(snp.contacts, snp.meal.reimb, by = c("CEID", "SiteID", "CEName"
 
 SSO data was obtained from the TDA F&N Meals Served Dashboard.
 
-2021-2022 Monthly SNP & SSO School Meal Count:
-https://data.texas.gov/dataset/2021-2022-Monthly-School-Meal-Count/dyrd-amq2
+* [2021-2022 Monthly SNP & SSO School Meal Count](https://data.texas.gov/dataset/2021-2022-Monthly-School-Meal-Count/dyrd-amq2)
 
 Note from the data dashboard:
 "In March 2020, USDA began allowing flexibility in nutrition assistance program policies to support continued meal access during the coronavirus pandemic (COVID-19). This included offering School Nutrition Program sponsors the option to provide meals through Seamless Summer Option (SSO) in program year 2021-2022." 
@@ -205,8 +205,7 @@ sso <- read.csv("2021-2022_School_Meal_Count_-_TDA_F_N_Dashboard.csv") %>%
 
 ### Child and Adult Care Food Program (CACFP)
 
-Child and Adult Care Food Programs (CACFP) – At Risk– Meal Reimbursement – Program Year 2021-2022:
-https://data.texas.gov/dataset/Child-and-Adult-Care-Food-Programs-CACFP-At-Risk-M/e4wr-4i5j
+* [Child and Adult Care Food Programs (CACFP) – At Risk– Meal Reimbursement – Program Year 2021-2022](https://data.texas.gov/dataset/Child-and-Adult-Care-Food-Programs-CACFP-At-Risk-M/e4wr-4i5j)
 
 CACFP data captures meals (supper) served in At-Risk afterschool care centers.
 
@@ -340,11 +339,15 @@ Credit for supper and snacks was given if any were offered by any site in the di
 
 ## Overall Rankings
 
-District scores were calculated as follows:\
-  25% percent of lunch participation\
-  50% percent of Breakfast participation\
-  10% serving supper\
-  15% serving after school snacks
+District scores were calculated as follows
+
+* 25% lunch participation percent
+
+* 50% breakfast participation percent
+
+* 10% serving supper
+
+* 15% serving after school snacks
 
 We only include districts that have at least 1,000 students and at least 60% economically disadvantaged student population.
 
@@ -381,7 +384,7 @@ write_csv(district_rankings, here("foodrankings_PY22_10k.csv"))
 ## Large districts
 Districts are considered large if they have at least 50,000 students.
 
-``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
+``` {r, echo=FALSE, warning=FALSE, message = FALSE}
 district_50k <- district %>% 
   filter(tea.all.stud>=50000 & eco.dis.pct >= 60) %>% 
   mutate(district_sum = ((Pct.Lunch.Participation*0.25)+(Pct.Breakfast.Participation*0.5)+(cacfp_supper01*0.1)+(snack_anyafter*0.15))) %>% 
@@ -438,7 +441,9 @@ write_csv(district_middleincome, here("foodrankings_PY22_middleincome.csv"))
 
 # Key Take-Aways
 
-`r sum(tea$tea.all.stud, na.rm = T)` number of students that qualify for free meals
+`r sum(tea$tea.all.stud, na.rm = T)` 
+
+All 5,429,895 students in Texas qualified for free meals this year.
 
 top ranking districts participation rates
 
