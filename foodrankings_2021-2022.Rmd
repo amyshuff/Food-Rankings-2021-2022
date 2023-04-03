@@ -32,6 +32,7 @@ library(reshape2)
 library(stringr)
 library(here)
 library(readxl)
+
 ```
 
 # Data Sources
@@ -105,6 +106,9 @@ snp.contacts <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal De
          SevereNeedBreakfast, UniversalFreeBreakfast, AreaEligibleSnack, CEP, Provision2)
 
 #Meal Reimbursement Claims has the number of meals served
+#This data includes meals in June and July. Do we want to include summer meals?
+  #If so, shouldn't we be including Summer Food Service Program (SFSP) data? See here: https://data.texas.gov/stories/s/52en-tt82
+  #If not, should we be excluding June and July data?
 #this tab has claims each month for each site
 #the work here represents what was done in excel last year
 snp.meal.reimb <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal Detail_01312023.xlsx"), sheet = 3) %>%
@@ -457,12 +461,15 @@ write_csv(district_middleincome, here("foodrankings_PY22_middleincome.csv"))
 
 my_kable(district_middleincome, 5, caption="Top 5 Middle-income Districts", format.args=list(big.mark=","))
 
+
+
 ```
 </font>
 \
 
 # Key Take-Aways
 
+`r #sum(tea$tea.all.stud, na.rm = T)`
 All 5,429,895 students in Texas were offered free meals this year.
 
 The top ranking districts all had over 70% of their student population participating in lunch
@@ -481,3 +488,66 @@ District with the highest breakfast participation: Eagle Pass ISD, with `r max(d
 
 `r #mean(district$cacfp_supper01)`
 16.6% of districts participate in the CACFP after-school meal program
+
+\
+
+# Longitudinal Data
+
+* [Meal and Reimbursement Data, Program Years 2015-2022](https://data.texas.gov/stories/s/e2dm-5r4v)
+
+Because the last two years had an unprecedented number of free meals available to students due to covid relief money, we wanted to see what impact that had on the total number of meals served from year to year. This will be especially interesting to look at next year now that the programs have ended.
+
+``` {r, echo=FALSE, warning=FALSE, message = FALSE}
+
+#import data from each year
+#need to find new sources that includes SSO (maybe also SFSP?)
+
+snp_PY22 <- read_csv("Longitudinal/School_Nutrition_Programs_-_Meal_Reimbursement_Information_-_Program_Year_2021-2022.csv") %>% 
+  group_by(ProgramYear) %>% 
+  summarise(BreakfastTotal = sum(BreakfastTotal, na.rm = T),
+            LunchTotal = sum(LunchTotal, na.rm = T))
+
+snp_PY21 <- read_csv("Longitudinal/School_Nutrition_Programs_-_Meal_Reimbursement_Information_-_Program_Year_2020-2021.csv") %>% 
+  group_by(ProgramYear) %>% 
+  summarise(BreakfastTotal = sum(BreakfastTotal, na.rm = T),
+            LunchTotal = sum(LunchTotal, na.rm = T))
+
+snp_PY20 <- read_csv("Longitudinal/School_Nutrition_Programs_-_Meal_Reimbursement_Information_-_Program_Year_2019-2020.csv") %>% 
+  group_by(ProgramYear) %>% 
+  summarise(BreakfastTotal = sum(BreakfastTotal, na.rm = T),
+            LunchTotal = sum(LunchTotal, na.rm = T))
+
+snp_PY19 <- read_csv("Longitudinal/School_Nutrition_Programs___Meal_Reimbursement_Information___Program_Year_2018-2019.csv") %>% 
+  group_by(ProgramYear) %>% 
+  summarise(BreakfastTotal = sum(BreakfastTotal, na.rm = T),
+            LunchTotal = sum(LunchTotal, na.rm = T))
+
+snp_PY18 <- read_csv("Longitudinal/School_Nutrition_Programs___Meal_Reimbursement_Information___Program_Year_2017-2018.csv") %>% 
+  group_by(ProgramYear) %>% 
+  summarise(BreakfastTotal = sum(BreakfastTotal, na.rm = T),
+            LunchTotal = sum(LunchTotal, na.rm = T))
+
+snp_PY17 <- read_csv("Longitudinal/School_Nutrition_Programs___Meal_Reimbursement_Information___Program_Year_2016-2017.csv") %>% 
+  group_by(ProgramYear) %>% 
+  summarise(BreakfastTotal = sum(BreakfastTotal, na.rm = T),
+            LunchTotal = sum(LunchTotal, na.rm = T))
+
+snp_PY16 <- read_csv("Longitudinal/School_Nutrition_Programs___Meal_Reimbursement_Information___Program_Year_2015-2016.csv") %>% 
+  group_by(ProgramYear) %>% 
+  summarise(BreakfastTotal = sum(BreakfastTotal, na.rm = T),
+            LunchTotal = sum(LunchTotal, na.rm = T))
+
+snp_longitudinal <- full_join(snp_PY16,snp_PY17, by = c("ProgramYear", "BreakfastTotal", "LunchTotal")) %>% 
+  full_join(snp_PY18, by=c("ProgramYear", "BreakfastTotal", "LunchTotal")) %>% 
+  full_join(snp_PY19, by=c("ProgramYear", "BreakfastTotal", "LunchTotal")) %>% 
+  full_join(snp_PY20, by=c("ProgramYear", "BreakfastTotal", "LunchTotal")) %>% 
+  full_join(snp_PY21, by=c("ProgramYear", "BreakfastTotal", "LunchTotal")) %>% 
+  full_join(snp_PY22, by=c("ProgramYear", "BreakfastTotal", "LunchTotal"))
+
+
+ggplot(snp_longitudinal, aes(x=ProgramYear, y=LunchTotal)) +
+  geom_point()
+
+
+
+```
