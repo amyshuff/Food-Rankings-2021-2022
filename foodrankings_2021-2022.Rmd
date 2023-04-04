@@ -10,7 +10,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 ```
 
 
@@ -20,7 +20,7 @@ The code used to create our rankings is available to the public on [github]( htt
 
 \
 
-``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
+``` {r, results='hide'}
 # March 2023 Update
 # Last year the file "Sample Dataset Template_PY21 SNP Meals_ChildrenAtRisk_11152021" outlined how the TDA data was manipulated in Excel before being imported into R. The goal with this update is to do as much work as possible in R.
 
@@ -50,7 +50,7 @@ Economically disadvantaged counts are sometimes unavailable, so in that case the
 
 Percent economically disadvantaged for each district is calculated from the campus student counts.
 
-``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
+``` {r, results='hide'}
 
 #This is something we request for the school rankings.
 
@@ -85,7 +85,7 @@ SNP Data includes meal counts from the National School Lunch Program (NSLP) and 
 Credit for participating in the Community Eligible Provision (CEP) was given to the entire district if they had any participating location.
 
 
-``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
+``` {r, results='hide'}
 
 # This year TDA School Nutrition Program Data is from our public records request.
 # It comes in an excel sheet with multiple tabs. We'll import each of the tabs, select the variables we want to keep, then join them together.
@@ -189,11 +189,13 @@ Note from the data dashboard:
 The SSO is what schools used to offer free meals to all students regardless of income. Because of this, we are choosing to look at total number of meals served instead of only the free and reduced as we've done in years past. This option will not be available next year because the program has ended. 
 
 
-``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
+``` {r, results='hide'}
 
 #This waiver has ended, so disregard this part next year.
 
 sso <- read.csv("2021-2022_School_Meal_Count_-_TDA_F_N_Dashboard.csv") %>% 
+  #Sept claims were incorrectly listed AS 2020-2021, so I'm fixing that issue here.
+  mutate(ProgramYear = "2021-2022") %>% 
   filter(ProgramYear == "2021-2022",
          Program == "SEAMLESS_SUMMER_OPTION_MEALS") %>% 
   group_by(CEID, SiteID) %>%
@@ -218,7 +220,7 @@ sso <- read.csv("2021-2022_School_Meal_Count_-_TDA_F_N_Dashboard.csv") %>%
 
 CACFP data captures meals (supper) served in At-Risk afterschool care centers.
 
-``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
+``` {r, results='hide'}
 #Next year, use this link: https://data.texas.gov/stories/s/iekx-7mdi
 #and scroll down to CACFP At-Risk Child Care Claims
 
@@ -244,10 +246,7 @@ cacfp <- read.csv(here("Child_and_Adult_Care_Food_Programs__CACFP____At_Risk__Me
 
 ## Harmony Districts
 
-Harmony Public Schools are listed under multiple district numbers (101858, 101862, 71806, 15828, 161807, 101846, 227816) in both the TEA and TDA data, but we combine them and consider them as a single district.
-
-
-```{r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
+```{r, results='hide'}
 
 
 harmony <- c(101858, 101862, 71806, 15828, 161807, 101846, 227816) #use to combine Harmony districts
@@ -257,12 +256,14 @@ kipp_data <- c(227820, 57837, 101813, 15826) #use to combine KIPP districts
 
 ```
 
+Harmony Public Schools are listed under multiple district numbers (`r paste(harmony, collapse = ', ')`) in both the TEA and TDA data, but we combine them and consider them as a single district.
+
 ## Aggregate data up to district level
 
 TDA data is reported monthly by Contracting Entities (CE) and participating sites. Usually October is used as the snapshot claim month for the year. This year fewer sites reported to TDA, and those that did didn't report every month, instead favoring SSO for meal reimbursement, so we used their maximum claim month for the year instead.
 
 
-``` {r, echo=FALSE, warning=FALSE, results='hide', message = FALSE}
+``` {r, results='hide'}
 district <- full_join(snp, cacfp, by=c("CEID", "SiteID", "CEName", "District", "ESC.Region", "County")) %>% 
   full_join(sso, by=c("CEID", "SiteID", "CEName", "District", "ESC.Region", "County"))
 
@@ -361,7 +362,7 @@ District scores were calculated as follows
 We only include districts that have at least 1,000 students and at least 60% economically disadvantaged student population.
 
 <font size="1">
-``` {r, echo=FALSE, warning=FALSE}
+``` {r}
 district_rankings <- district %>% 
   #remove small districts (less than 10,000 students) and those that aren't at least 60% economically disadvantaged
   filter(tea.all.stud>=10000 & eco.dis.pct >= 60) %>% 
@@ -399,7 +400,7 @@ my_kable(district_rankings, 10, caption="Top 10 Districts Overall", format.args=
 ## Large districts
 Districts are considered large if they have at least 50,000 students.
 <font size="1">
-``` {r, echo=FALSE, warning=FALSE}
+``` {r}
 district_50k <- district %>% 
   filter(tea.all.stud>=50000 & eco.dis.pct >= 60) %>% 
   mutate(district_sum = ((Pct.Lunch.Participation*0.25)+(Pct.Breakfast.Participation*0.5)+(cacfp_supper01*0.1)+(snack_anyafter*0.15))) %>% 
@@ -435,7 +436,7 @@ my_kable(district_50k, 5, caption="Top 5 Large Districts", format.args=list(big.
 Districts are considered middle-income if they have 60-70% economically disadvantaged student population. This takes out high poverty schools and focuses on those which often face more challenges in implementing school food programs to scale.
 
 <font size="1">
-``` {r, echo=FALSE, warning=FALSE}
+``` {r}
 district_middleincome <- district %>% 
   filter(tea.all.stud>=10000 & eco.dis.pct >= 60 & eco.dis.pct <=70) %>% 
   mutate(district_sum = ((Pct.Lunch.Participation*0.25)+(Pct.Breakfast.Participation*0.5)+(cacfp_supper01*0.1)+(snack_anyafter*0.15))) %>% 
@@ -469,20 +470,36 @@ my_kable(district_middleincome, 5, caption="Top 5 Middle-income Districts", form
 
 # Key Take-Aways
 
-`r #sum(tea$tea.all.stud, na.rm = T)`
-All 5,429,895 students in Texas were offered free meals this year.
+``` {r, results='hide'} 
+
+totalstudents <- sum(tea$tea.all.stud, na.rm = T) %>% 
+  format(big.mark=",")
+
+#topten <- ifelse(district_rankings$"Rank" %in% 1:10, district_rankings"District Name", "")
+
+#topten <- paste(district_rankings$"District Name", collapse = ', '
+
+#`r arrange(-district_rankings$"% Lunch Participation"), first(district_rankings$"District Name")`
+```
+
+All `r totalstudents` students in Texas were offered free meals this year.
 
 The top ranking districts all had over 70% of their student population participating in lunch
 
 Even the lowest ranked district had `r min(district_rankings$"% Lunch Participation")`% of their student population participating in lunch
 
-Top 10 school districts overall: Donna ISD, IDEA Academy, McAllen ISD, Harlandale ISD, Clint ISD, La Joya ISD, Eagle Pass ISD, Edinburg ISD, San Antonio ISD, Harlingen Consolidated ISD
+Top 10 school districts overall: `r paste(district_rankings$"District Name", collapse = ', ')`
+
+Clint ISD, Donna ISD, IDEA Academy, Harlandale ISD, McAllen ISD, Eagle Pass ISD, La Joya ISD, Edinburg ISD, San Antonio ISD, Harlingen Consolidated ISD
 
 Top 5 large school districts: IDEA Academy, Aldine ISD, Houston ISD, Dallas ISD, Garland ISD
 
 Top 5 middle-income school districts: Judson ISD, Wichita Falls ISD, New Caney ISD, East Central ISD, Victoria ISD
 
-District with the highest lunch participation: Donna ISD, with `r max(district_rankings$"% Lunch Participation")`% of their total student population participating in lunch 
+
+District with the highest lunch participation: 
+
+Donna ISD, with `r max(district_rankings$"% Lunch Participation")` of their total student population participating in lunch 
 
 District with the highest breakfast participation: Eagle Pass ISD, with `r max(district_rankings$"% Breakfast Participation")`% of their total student population participating in breakfast 
 
@@ -493,61 +510,113 @@ District with the highest breakfast participation: Eagle Pass ISD, with `r max(d
 
 # Longitudinal Data
 
-* [Meal and Reimbursement Data, Program Years 2015-2022](https://data.texas.gov/stories/s/e2dm-5r4v)
+* [Meal and Reimbursement Data, Program Years 2015-2021](https://data.texas.gov/stories/s/e2dm-5r4v)
 
 Because the last two years had an unprecedented number of free meals available to students due to covid relief money, we wanted to see what impact that had on the total number of meals served from year to year. This will be especially interesting to look at next year now that the programs have ended.
 
-``` {r, echo=FALSE, warning=FALSE, message = FALSE}
+``` {r}
 
 #import data from each year
-#need to find new sources that includes SSO (maybe also SFSP?)
+#PY21 needs SSO added 
 
-snp_PY22 <- read_csv("Longitudinal/School_Nutrition_Programs_-_Meal_Reimbursement_Information_-_Program_Year_2021-2022.csv") %>% 
+snp_PY22 <- read_csv("2021-2022_School_Meal_Count_-_TDA_F_N_Dashboard.csv") %>% 
+  mutate(ProgramYear = "2021-2022") %>% 
   group_by(ProgramYear) %>% 
   summarise(BreakfastTotal = sum(BreakfastTotal, na.rm = T),
-            LunchTotal = sum(LunchTotal, na.rm = T))
+            BreakfastDays = sum(BreakfastDays, na.rm = T),
+            LunchTotal = sum(LunchTotal, na.rm = T),
+            LunchDays = sum(LunchDays, na.rm = T))
 
 snp_PY21 <- read_csv("Longitudinal/School_Nutrition_Programs_-_Meal_Reimbursement_Information_-_Program_Year_2020-2021.csv") %>% 
   group_by(ProgramYear) %>% 
   summarise(BreakfastTotal = sum(BreakfastTotal, na.rm = T),
-            LunchTotal = sum(LunchTotal, na.rm = T))
+            BreakfastDays = sum(BreakfastDays, na.rm = T),
+            LunchTotal = sum(LunchTotal, na.rm = T),
+            LunchDays = sum(LunchDays, na.rm = T))
 
 snp_PY20 <- read_csv("Longitudinal/School_Nutrition_Programs_-_Meal_Reimbursement_Information_-_Program_Year_2019-2020.csv") %>% 
   group_by(ProgramYear) %>% 
   summarise(BreakfastTotal = sum(BreakfastTotal, na.rm = T),
-            LunchTotal = sum(LunchTotal, na.rm = T))
+            BreakfastDays = sum(BreakfastDays, na.rm = T),
+            LunchTotal = sum(LunchTotal, na.rm = T),
+            LunchDays = sum(LunchDays, na.rm = T))
 
 snp_PY19 <- read_csv("Longitudinal/School_Nutrition_Programs___Meal_Reimbursement_Information___Program_Year_2018-2019.csv") %>% 
   group_by(ProgramYear) %>% 
   summarise(BreakfastTotal = sum(BreakfastTotal, na.rm = T),
-            LunchTotal = sum(LunchTotal, na.rm = T))
+            BreakfastDays = sum(BreakfastDays, na.rm = T),
+            LunchTotal = sum(LunchTotal, na.rm = T),
+            LunchDays = sum(LunchDays, na.rm = T))
 
 snp_PY18 <- read_csv("Longitudinal/School_Nutrition_Programs___Meal_Reimbursement_Information___Program_Year_2017-2018.csv") %>% 
   group_by(ProgramYear) %>% 
   summarise(BreakfastTotal = sum(BreakfastTotal, na.rm = T),
-            LunchTotal = sum(LunchTotal, na.rm = T))
+            BreakfastDays = sum(BreakfastDays, na.rm = T),
+            LunchTotal = sum(LunchTotal, na.rm = T),
+            LunchDays = sum(LunchDays, na.rm = T))
 
 snp_PY17 <- read_csv("Longitudinal/School_Nutrition_Programs___Meal_Reimbursement_Information___Program_Year_2016-2017.csv") %>% 
   group_by(ProgramYear) %>% 
   summarise(BreakfastTotal = sum(BreakfastTotal, na.rm = T),
-            LunchTotal = sum(LunchTotal, na.rm = T))
+            BreakfastDays = sum(BreakfastDays, na.rm = T),
+            LunchTotal = sum(LunchTotal, na.rm = T),
+            LunchDays = sum(LunchDays, na.rm = T))
 
 snp_PY16 <- read_csv("Longitudinal/School_Nutrition_Programs___Meal_Reimbursement_Information___Program_Year_2015-2016.csv") %>% 
   group_by(ProgramYear) %>% 
   summarise(BreakfastTotal = sum(BreakfastTotal, na.rm = T),
-            LunchTotal = sum(LunchTotal, na.rm = T))
+            BreakfastDays = sum(BreakfastDays, na.rm = T),
+            LunchTotal = sum(LunchTotal, na.rm = T),
+            LunchDays = sum(LunchDays, na.rm = T))
 
-snp_longitudinal <- full_join(snp_PY16,snp_PY17, by = c("ProgramYear", "BreakfastTotal", "LunchTotal")) %>% 
-  full_join(snp_PY18, by=c("ProgramYear", "BreakfastTotal", "LunchTotal")) %>% 
-  full_join(snp_PY19, by=c("ProgramYear", "BreakfastTotal", "LunchTotal")) %>% 
-  full_join(snp_PY20, by=c("ProgramYear", "BreakfastTotal", "LunchTotal")) %>% 
-  full_join(snp_PY21, by=c("ProgramYear", "BreakfastTotal", "LunchTotal")) %>% 
-  full_join(snp_PY22, by=c("ProgramYear", "BreakfastTotal", "LunchTotal"))
+#join data
+snp_longitudinal <- full_join(snp_PY16,snp_PY17, by = c("ProgramYear", "BreakfastTotal", "BreakfastDays", "LunchTotal", "LunchDays")) %>% 
+  full_join(snp_PY18, by=c("ProgramYear", "BreakfastTotal", "BreakfastDays", "LunchTotal", "LunchDays")) %>% 
+  full_join(snp_PY19, by=c("ProgramYear", "BreakfastTotal", "BreakfastDays", "LunchTotal", "LunchDays")) %>% 
+  full_join(snp_PY20, by=c("ProgramYear", "BreakfastTotal", "BreakfastDays", "LunchTotal", "LunchDays")) %>% 
+  full_join(snp_PY21, by=c("ProgramYear", "BreakfastTotal", "BreakfastDays", "LunchTotal", "LunchDays")) %>% 
+  full_join(snp_PY22, by=c("ProgramYear", "BreakfastTotal", "BreakfastDays", "LunchTotal", "LunchDays")) %>% 
+  mutate(BreakfastADP = BreakfastTotal/BreakfastDays,
+         LunchADP = LunchTotal/LunchDays)
+```
 
+Looking at the total number of breakfast and lunch meals served to all students from year to year, the number actually decreased for 2021-2022. Could be due to staffing issues, supply issues, and school shut downs.
+\
+``` {r}
 
-ggplot(snp_longitudinal, aes(x=ProgramYear, y=LunchTotal)) +
-  geom_point()
+ggplot(snp_longitudinal, aes(x=ProgramYear)) +
+  geom_point(aes(y=LunchTotal, color="LunchTotal")) +
+  geom_point(aes(y=BreakfastTotal, color="BreakfastTotal")) +
+  coord_cartesian(ylim = c(0, 600000000)) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title = "Meals Served")
 
+```
 
+Looking at the number of days breakfast and lunch were served, there was a decrease in 2020-2021 as well.
+\
+``` {r}
+
+ggplot(snp_longitudinal, aes(x=ProgramYear)) +
+  geom_point(aes(y=BreakfastDays, color="BreakfastDays"), position = "jitter") +
+  geom_point(aes(y=LunchDays, color="LunchDays")) +
+  coord_cartesian(ylim = c(0, 1500000)) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title = "Days Meals Were Served")
+
+```
+
+Finding the average daily participation rates (Total Meals divided by Total Days Served)
+
+Note that the data is organized by site, so this is the average number of students served on each site each day. The rate was slightly higher in 2021-2022 for lunch but not for breakfast.
+\
+``` {r}
+
+ggplot(snp_longitudinal, aes(x=ProgramYear)) +
+  geom_point(aes(y=BreakfastADP, color="BreakfastADP")) +
+  geom_point(aes(y=LunchADP, color="LunchADP")) +
+  coord_cartesian(ylim = c(0, 400)) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title = "Average Daily Participation by Site")
 
 ```
