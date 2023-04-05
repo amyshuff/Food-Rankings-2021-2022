@@ -3,9 +3,9 @@ title: "2023 Food Rankings"
 author: "Amy Shuff"
 date: "`r Sys.Date()`"
 output:
+  word_document: default
   html_document:
     df_print: paged
-  word_document: default
   pdf_document: default
 ---
 
@@ -480,6 +480,7 @@ totalstudents <- sum(tea$tea.all.stud, na.rm = T) %>%
 #topten <- paste(district_rankings$"District Name", collapse = ', '
 
 #`r arrange(-district_rankings$"% Lunch Participation"), first(district_rankings$"District Name")`
+#`r paste(district_rankings$"District Name", collapse = ', ')`
 ```
 
 All `r totalstudents` students in Texas were offered free meals this year.
@@ -488,18 +489,14 @@ The top ranking districts all had over 70% of their student population participa
 
 Even the lowest ranked district had `r min(district_rankings$"% Lunch Participation")`% of their student population participating in lunch
 
-Top 10 school districts overall: `r paste(district_rankings$"District Name", collapse = ', ')`
-
-Clint ISD, Donna ISD, IDEA Academy, Harlandale ISD, McAllen ISD, Eagle Pass ISD, La Joya ISD, Edinburg ISD, San Antonio ISD, Harlingen Consolidated ISD
+Top 10 school districts overall: Clint ISD, Donna ISD, IDEA Academy, Harlandale ISD, McAllen ISD, Eagle Pass ISD, La Joya ISD, Edinburg ISD, San Antonio ISD, Harlingen Consolidated ISD
 
 Top 5 large school districts: IDEA Academy, Aldine ISD, Houston ISD, Dallas ISD, Garland ISD
 
 Top 5 middle-income school districts: Judson ISD, Wichita Falls ISD, New Caney ISD, East Central ISD, Victoria ISD
 
 
-District with the highest lunch participation: 
-
-Donna ISD, with `r max(district_rankings$"% Lunch Participation")` of their total student population participating in lunch 
+District with the highest lunch participation: Los Fresnos Consolidated ISD, with `r max(district_rankings$"% Lunch Participation")`% of their total student population participating in lunch 
 
 District with the highest breakfast participation: Eagle Pass ISD, with `r max(district_rankings$"% Breakfast Participation")`% of their total student population participating in breakfast 
 
