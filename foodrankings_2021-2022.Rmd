@@ -3,9 +3,9 @@ title: "2023 Food Rankings"
 author: "Amy Shuff"
 date: "`r Sys.Date()`"
 output:
-  word_document: default
   html_document:
     df_print: paged
+  word_document: default
   pdf_document: default
 ---
 
@@ -92,6 +92,7 @@ Credit for participating in the Community Eligible Provision (CEP) was given to 
 # This will probably look different next year. First check the Texas Open Data Portal for data before submitting records request.
 # Notes from last year say that only the universal breakfast waiver information wasn't available without PIR
 # Use this link to look for next year's data: https://data.texas.gov/stories/s/e2dm-5r4v
+# Or see the Data Overview Pages in this link: https://squaremeals.org/FandN-Resources/Open-Data-Portal
 
 # Contacts and Participation has CEP data
 snp.contacts <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal Detail_01312023.xlsx"), sheet = 2) %>%
@@ -106,9 +107,7 @@ snp.contacts <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal De
          SevereNeedBreakfast, UniversalFreeBreakfast, AreaEligibleSnack, CEP, Provision2)
 
 #Meal Reimbursement Claims has the number of meals served
-#This data includes meals in June and July. Do we want to include summer meals?
-  #If so, shouldn't we be including Summer Food Service Program (SFSP) data? See here: https://data.texas.gov/stories/s/52en-tt82
-  #If not, should we be excluding June and July data?
+#This data includes meals in June and July. I'm assuming those were school years that started early or ended late. 
 #this tab has claims each month for each site
 #the work here represents what was done in excel last year
 snp.meal.reimb <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal Detail_01312023.xlsx"), sheet = 3) %>%
@@ -131,6 +130,7 @@ snp.meal.reimb <- read_xlsx(here("WF Attachment 180587 PIR 23-194_PY22 SNP Meal 
         CEName = first(CEName),
         County = first(CECounty),
         District = first(CountyDistrictCode),
+        TypeOfOrg = first(TypeOfOrg),
         ESC.Region = first(ESC.Region),
         
         # this sum would find the october number, if we were using that method
@@ -203,6 +203,7 @@ sso <- read.csv("2021-2022_School_Meal_Count_-_TDA_F_N_Dashboard.csv") %>%
         CEName = first(CEName),
         County = first(CECounty),
         District = first(CountyDistrictCode),
+        TypeOfOrg = first(TypeOfOrg),
         ESC.Region = first(ESC),
         
         #sums here represent site total for year
@@ -265,7 +266,7 @@ TDA data is reported monthly by Contracting Entities (CE) and participating site
 
 ``` {r, results='hide'}
 district <- full_join(snp, cacfp, by=c("CEID", "SiteID", "CEName", "District", "ESC.Region", "County")) %>% 
-  full_join(sso, by=c("CEID", "SiteID", "CEName", "District", "ESC.Region", "County"))
+  full_join(sso, by=c("CEID", "SiteID", "CEName", "District", "ESC.Region", "County", "TypeOfOrg"))
 
 district$District = gsub("-", "", district$District)
 
@@ -281,6 +282,7 @@ district <- district %>%
           CEName = first(CEName),
           County = first(na.omit(County)),
           ESC.Region = first(ESC.Region),
+          TypeOfOrg = first(na.omit(TypeOfOrg)),
           #Eligible.Free = sum(Eligible.Free, na.rm = T),
           #Enrollment_TDA = sum(Enrollment_TDA, na.rm = T),
           #Eligible.Reduced = sum(Eligible.Reduced, na.rm = T),
@@ -372,13 +374,14 @@ district_rankings <- district %>%
   
   arrange(-district_sum) %>% 
   mutate(Rank = row_number()) %>% 
-  select(CEName, Rank, County, ESC.Region, tea.all.stud, eco.dis.pct, district_sum, Pct.Lunch.Participation, 
+  select(CEName, TypeOfOrg, Rank, County, ESC.Region, tea.all.stud, eco.dis.pct, district_sum, Pct.Lunch.Participation, 
          Pct.Breakfast.Participation, cacfp_supper01, snack_anyafter, CEP) %>%
   mutate(cacfp_supper01 = ifelse(cacfp_supper01==100, "Yes", "No"),
          snack_anyafter = ifelse(snack_anyafter==100, "Yes", "No"),
          CEP = ifelse(CEP>0, "Yes", "No")) %>% 
   mutate_if(is.numeric, round, digits = 1) %>% 
   reshape::rename(c(CEName = "District Name",
+                    TypeOfOrg = "School Type",
                     ESC.Region = "ESC Region",
                     tea.all.stud = "Total Enrollment",
                     eco.dis.pct = "% Economically Disadvantaged",
@@ -390,19 +393,24 @@ district_rankings <- district %>%
 
 write_csv(district_rankings, here("foodrankings_PY22_10k.csv"))
 
-my_kable = function(x, max.rows=10, ...) {kable(x[1:max.rows, ], ...)}
+topten <- district_rankings %>% 
+  filter(Rank <= 10)
 
-my_kable(district_rankings, 10, caption="Top 10 Districts Overall", format.args=list(big.mark=","))
+kable(topten, caption="Top 10 Districts Overall", format.args=list(big.mark=","))
 
 ```
 </font>
 
-## Large districts
-Districts are considered large if they have at least 50,000 students.
+## Large public districts
+Districts are considered large if they have at least 50,000 students. Public district here specifically means it is not a charter district.
+
 <font size="1">
 ``` {r}
+
+#The decision to take out charter districts from this category was made by Dr. Bob: "Idea academy is a state wide District, they have schools all over the state, including San Antonio… So the number that is showing isnt for one district and one area, it’s all over the state, I probably would not include them in a large school district category, since they are not limited to one community."
+
 district_50k <- district %>% 
-  filter(tea.all.stud>=50000 & eco.dis.pct >= 60) %>% 
+  filter(tea.all.stud>=50000 & eco.dis.pct >= 60 & TypeOfOrg == "Public") %>% 
   mutate(district_sum = ((Pct.Lunch.Participation*0.25)+(Pct.Breakfast.Participation*0.5)+(cacfp_supper01*0.1)+(snack_anyafter*0.15))) %>% 
   arrange(-district_sum) %>% 
   mutate(Rank = row_number()) %>% 
@@ -424,10 +432,11 @@ district_50k <- district %>%
 
 write_csv(district_50k, here("foodrankings_PY22_50k.csv"))
 
-my_kable(district_50k, 5, caption="Top 5 Large Districts", format.args=list(big.mark=","))
 
-#kable(district_50k)
+largedistricts <- district_50k %>% 
+  filter(Rank <= 5)
 
+kable(largedistricts, caption="Top 5 Large Districts", format.args=list(big.mark=","))
 
 ```
 </font>
@@ -460,54 +469,81 @@ district_middleincome <- district %>%
 
 write_csv(district_middleincome, here("foodrankings_PY22_middleincome.csv"))
 
-my_kable(district_middleincome, 5, caption="Top 5 Middle-income Districts", format.args=list(big.mark=","))
 
+middleincomedistricts <- district_middleincome %>% 
+  filter(Rank <= 5)
 
+kable(middleincomedistricts, caption="Top 5 Middle-income Districts", format.args=list(big.mark=","))
 
 ```
 </font>
+
+## Charter School Districts
+
+<font size="1">
+``` {r} 
+
+charter <- district_rankings %>% 
+  filter(`School Type`== "Charter") %>% 
+  reshape::rename(c(Rank = "Overall Rank"))
+
+kable(charter, caption="Charter School Districts", format.args=list(big.mark=","))
+
+```
+</font>
+
+There are `r nrow(charter)` charter districts that meet our ranking criteria. `r first(charter$"District Name")` is the highest performing, ranked #`r min(charter$"Overall Rank")` overall.
+
 \
 
 # Key Take-Aways
 
+All `r format(sum(tea$tea.all.stud, na.rm = T), big.mark=",")` students in Texas were offered free meals this year
+
+\
+
+The top ranking districts all had over `r min(topten$"% Lunch Participation")`% of their student population participating in lunch
+
+\
+
+Top 10 school districts overall: `r paste(topten$"District Name", collapse = ', ')` 
+
+Top 5 large public school districts: `r paste(largedistricts$"District Name", collapse = ', ')`
+
+Top 5 middle-income school districts: `r paste(middleincomedistricts$"District Name", collapse = ', ')`
+
 ``` {r, results='hide'} 
 
-totalstudents <- sum(tea$tea.all.stud, na.rm = T) %>% 
-  format(big.mark=",")
+breakfast <- district_rankings %>% arrange(-`% Breakfast Participation`)
+lunch <- district_rankings %>% arrange(-`% Lunch Participation`)
 
-#topten <- ifelse(district_rankings$"Rank" %in% 1:10, district_rankings"District Name", "")
-
-#topten <- paste(district_rankings$"District Name", collapse = ', '
-
-#`r arrange(-district_rankings$"% Lunch Participation"), first(district_rankings$"District Name")`
-#`r paste(district_rankings$"District Name", collapse = ', ')`
 ```
 
-All `r totalstudents` students in Texas were offered free meals this year.
+\
 
-The top ranking districts all had over 70% of their student population participating in lunch
+District with the highest lunch participation: `r first(lunch$"District Name")`, with `r max(district_rankings$"% Lunch Participation")`% of their total student population participating in lunch 
 
-Even the lowest ranked district had `r min(district_rankings$"% Lunch Participation")`% of their student population participating in lunch
+District with the lowest lunch participation: `r last(lunch$"District Name")`, with `r min(district_rankings$"% Lunch Participation")`% of their total student population participating in lunch 
 
-Top 10 school districts overall: Clint ISD, Donna ISD, IDEA Academy, Harlandale ISD, McAllen ISD, Eagle Pass ISD, La Joya ISD, Edinburg ISD, San Antonio ISD, Harlingen Consolidated ISD
+\
 
-Top 5 large school districts: IDEA Academy, Aldine ISD, Houston ISD, Dallas ISD, Garland ISD
+District with the highest breakfast participation: `r first(breakfast$"District Name")`, with `r max(district_rankings$"% Breakfast Participation")`% of their total student population participating in breakfast 
 
-Top 5 middle-income school districts: Judson ISD, Wichita Falls ISD, New Caney ISD, East Central ISD, Victoria ISD
+District with the lowest breakfast participation: `r last(breakfast$"District Name")`, with `r min(district_rankings$"% Breakfast Participation")`% of their total student population participating in breakfast 
+
+\
+
+`r format(mean(district$cacfp_supper01), digits = 3)`% of districts participate in the CACFP after-school meal program
 
 
-District with the highest lunch participation: Los Fresnos Consolidated ISD, with `r max(district_rankings$"% Lunch Participation")`% of their total student population participating in lunch 
-
-District with the highest breakfast participation: Eagle Pass ISD, with `r max(district_rankings$"% Breakfast Participation")`% of their total student population participating in breakfast 
-
-`r #mean(district$cacfp_supper01)`
-16.6% of districts participate in the CACFP after-school meal program
 
 \
 
 # Longitudinal Data
 
-* [Meal and Reimbursement Data, Program Years 2015-2021](https://data.texas.gov/stories/s/e2dm-5r4v)
+* [2021-2022 Monthly SNP & SSO School Meal Count](https://data.texas.gov/dataset/2021-2022-Monthly-School-Meal-Count/dyrd-amq2)
+
+* [Meal and Reimbursement Data, Program Years 2015-2019](https://data.texas.gov/stories/s/e2dm-5r4v)
 
 Because the last two years had an unprecedented number of free meals available to students due to covid relief money, we wanted to see what impact that had on the total number of meals served from year to year. This will be especially interesting to look at next year now that the programs have ended.
 
@@ -524,19 +560,21 @@ snp_PY22 <- read_csv("2021-2022_School_Meal_Count_-_TDA_F_N_Dashboard.csv") %>%
             LunchTotal = sum(LunchTotal, na.rm = T),
             LunchDays = sum(LunchDays, na.rm = T))
 
-snp_PY21 <- read_csv("Longitudinal/School_Nutrition_Programs_-_Meal_Reimbursement_Information_-_Program_Year_2020-2021.csv") %>% 
-  group_by(ProgramYear) %>% 
-  summarise(BreakfastTotal = sum(BreakfastTotal, na.rm = T),
-            BreakfastDays = sum(BreakfastDays, na.rm = T),
-            LunchTotal = sum(LunchTotal, na.rm = T),
-            LunchDays = sum(LunchDays, na.rm = T))
+# PY21 would need SFSP and SSO data added. I'm not going to mess with that, so I'll just leave it out.
+# snp_PY21 <- read_csv("Longitudinal/School_Nutrition_Programs_-_Meal_Reimbursement_Information_-_Program_Year_2020-2021.csv") %>% 
+#   group_by(ProgramYear) %>% 
+#   summarise(BreakfastTotal = sum(BreakfastTotal, na.rm = T),
+#             BreakfastDays = sum(BreakfastDays, na.rm = T),
+#             LunchTotal = sum(LunchTotal, na.rm = T),
+#             LunchDays = sum(LunchDays, na.rm = T))
 
-snp_PY20 <- read_csv("Longitudinal/School_Nutrition_Programs_-_Meal_Reimbursement_Information_-_Program_Year_2019-2020.csv") %>% 
-  group_by(ProgramYear) %>% 
-  summarise(BreakfastTotal = sum(BreakfastTotal, na.rm = T),
-            BreakfastDays = sum(BreakfastDays, na.rm = T),
-            LunchTotal = sum(LunchTotal, na.rm = T),
-            LunchDays = sum(LunchDays, na.rm = T))
+# PY20 was the first year of the pandemic. I'm not sure if it needs data added like PY21, so I'm leaving it out as well.
+# snp_PY20 <- read_csv("Longitudinal/School_Nutrition_Programs_-_Meal_Reimbursement_Information_-_Program_Year_2019-2020.csv") %>% 
+#   group_by(ProgramYear) %>% 
+#   summarise(BreakfastTotal = sum(BreakfastTotal, na.rm = T),
+#             BreakfastDays = sum(BreakfastDays, na.rm = T),
+#             LunchTotal = sum(LunchTotal, na.rm = T),
+#             LunchDays = sum(LunchDays, na.rm = T))
 
 snp_PY19 <- read_csv("Longitudinal/School_Nutrition_Programs___Meal_Reimbursement_Information___Program_Year_2018-2019.csv") %>% 
   group_by(ProgramYear) %>% 
@@ -570,8 +608,8 @@ snp_PY16 <- read_csv("Longitudinal/School_Nutrition_Programs___Meal_Reimbursemen
 snp_longitudinal <- full_join(snp_PY16,snp_PY17, by = c("ProgramYear", "BreakfastTotal", "BreakfastDays", "LunchTotal", "LunchDays")) %>% 
   full_join(snp_PY18, by=c("ProgramYear", "BreakfastTotal", "BreakfastDays", "LunchTotal", "LunchDays")) %>% 
   full_join(snp_PY19, by=c("ProgramYear", "BreakfastTotal", "BreakfastDays", "LunchTotal", "LunchDays")) %>% 
-  full_join(snp_PY20, by=c("ProgramYear", "BreakfastTotal", "BreakfastDays", "LunchTotal", "LunchDays")) %>% 
-  full_join(snp_PY21, by=c("ProgramYear", "BreakfastTotal", "BreakfastDays", "LunchTotal", "LunchDays")) %>% 
+  #full_join(snp_PY20, by=c("ProgramYear", "BreakfastTotal", "BreakfastDays", "LunchTotal", "LunchDays")) %>% 
+  #full_join(snp_PY21, by=c("ProgramYear", "BreakfastTotal", "BreakfastDays", "LunchTotal", "LunchDays")) %>% 
   full_join(snp_PY22, by=c("ProgramYear", "BreakfastTotal", "BreakfastDays", "LunchTotal", "LunchDays")) %>% 
   mutate(BreakfastADP = BreakfastTotal/BreakfastDays,
          LunchADP = LunchTotal/LunchDays)
