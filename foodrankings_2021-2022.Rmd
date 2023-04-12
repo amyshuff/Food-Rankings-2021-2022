@@ -393,6 +393,7 @@ district_rankings <- district %>%
 
 write_csv(district_rankings, here("foodrankings_PY22_10k.csv"))
 
+
 topten <- district_rankings %>% 
   filter(Rank <= 10)
 
@@ -430,7 +431,7 @@ district_50k <- district %>%
                     cacfp_supper01 = "CACFP Supper",
                     snack_anyafter = "Afterschool Snack")) 
 
-write_csv(district_50k, here("foodrankings_PY22_50k.csv"))
+#write_csv(district_50k, here("foodrankings_PY22_50k.csv"))
 
 
 largedistricts <- district_50k %>% 
@@ -467,7 +468,7 @@ district_middleincome <- district %>%
                     cacfp_supper01 = "CACFP Supper",
                     snack_anyafter = "Afterschool Snack")) 
 
-write_csv(district_middleincome, here("foodrankings_PY22_middleincome.csv"))
+#write_csv(district_middleincome, here("foodrankings_PY22_middleincome.csv"))
 
 
 middleincomedistricts <- district_middleincome %>% 
@@ -545,7 +546,9 @@ District with the lowest breakfast participation: `r last(breakfast$"District Na
 
 * [Meal and Reimbursement Data, Program Years 2015-2019](https://data.texas.gov/stories/s/e2dm-5r4v)
 
-Because the last two years had an unprecedented number of free meals available to students due to covid relief money, we wanted to see what impact that had on the total number of meals served from year to year. This will be especially interesting to look at next year now that the programs have ended.
+Because the last two years had an unprecedented number of free meals available to students due to covid relief money, we wanted to see what impact that had on the total number of meals served and average daily participation. This will be especially interesting to look at next year now that the programs have ended.
+
+Note that 2020-2021 and 2019-2020 were left out intentionally, as we just wanted to compare to pre-pandemic levels.
 
 ``` {r}
 
@@ -641,7 +644,7 @@ ggplot(snp_longitudinal, aes(x=ProgramYear)) +
 
 ```
 
-Finding the average daily participation rates (Total Meals divided by Total Days Served)
+Finding the average daily participation rates (Total Meals divided by Total Days Served).
 
 Note that the data is organized by site, so this is the average number of students served on each site each day. The rate was slightly higher in 2021-2022 for lunch but not for breakfast.
 \
