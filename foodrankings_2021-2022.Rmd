@@ -54,14 +54,11 @@ Percent economically disadvantaged for each district is calculated from the camp
 
 #This is something we request for the school rankings.
 
-tea <- read_xlsx("pru_7128_StudPgmStateCampus22state.xlsx", skip = 6)
-  
-#Small enrollment numbers are masked with numbers like <10, so here we'll remove all the "<" characters.
-#Enrollment for small campuses will be an over estimate.
-tea$"ALL ENROLLMENT" =  gsub("<", "", tea$"ALL ENROLLMENT")
-
-tea <- tea %>% 
-  mutate(ENROLLMENT = as.numeric(tea$"ALL ENROLLMENT"),
+tea <- read_xlsx("pru_7128_StudPgmStateCampus22state.xlsx", skip = 6) %>% 
+ #Small enrollment numbers are masked with numbers like <10, so here we'll remove all the "<" characters.
+ #Enrollment for small campuses will be an over estimate.
+  mutate(ENROLLMENT = gsub("<", "", tea$"ALL ENROLLMENT"),
+         ENROLLMENT = as.numeric(ENROLLMENT),
          #Economically disadvantaged numbers are masked with "-999"
          eco.dis = ifelse(tea$"ECONOMICALLY DISADVANTAGED" >= 0, tea$"ECONOMICALLY DISADVANTAGED", NA)) %>%
   rename(District.Number = "DISTRICT NUMBER") %>% 
@@ -69,6 +66,7 @@ tea <- tea %>%
   summarise(tea.all.stud = sum(ENROLLMENT),
             tea.eco.dis = sum(eco.dis, na.rm = T)) %>% 
   mutate(eco.dis.pct = (tea.eco.dis/tea.all.stud)*100)
+  
 ```
 
 \
