@@ -54,11 +54,14 @@ Percent economically disadvantaged for each district is calculated from the camp
 
 #This is something we request for the school rankings.
 
-tea <- read_xlsx("pru_7128_StudPgmStateCampus22state.xlsx", skip = 6) %>% 
+tea <- read_xlsx("pru_7128_StudPgmStateCampus22state.xlsx", skip = 6)
+  
  #Small enrollment numbers are masked with numbers like <10, so here we'll remove all the "<" characters.
  #Enrollment for small campuses will be an over estimate.
-  mutate(ENROLLMENT = gsub("<", "", tea$"ALL ENROLLMENT"),
-         ENROLLMENT = as.numeric(ENROLLMENT),
+tea$ENROLLMENT = gsub("<", "", tea$"ALL ENROLLMENT")
+
+tea <- tea %>% 
+  mutate(ENROLLMENT = as.numeric(ENROLLMENT),
          #Economically disadvantaged numbers are masked with "-999"
          eco.dis = ifelse(tea$"ECONOMICALLY DISADVANTAGED" >= 0, tea$"ECONOMICALLY DISADVANTAGED", NA)) %>%
   rename(District.Number = "DISTRICT NUMBER") %>% 
@@ -656,16 +659,21 @@ ggplot(snp_longitudinal, aes(x=ProgramYear)) +
   labs(title = "Average Daily Participation by Site")
 
 ```
+\
+
 # Comparison to School Performance
 
-https://tea.texas.gov/texas-schools/accountability/academic-accountability/performance-reporting/2022-accountability-rating-system
+I wanted to see if our food rankings score correlated with school performance. I looked at TEA's reported Overall Score, Student Achievement Score, Academic Growth Score, Relative Performance Score, School Progress Score, and Closing the Gaps Score. 
 
+Only the Academic Growth Score showed a positive correlation. 
 
-A downloadable spreadsheet of statewide 2022 ratings and demographic information is available.
-
-https://tea.texas.gov/sites/default/files/statewide_overall_accountability_ratings_2022.xlsx
+TEA Defines Academic Growth as: "Credit awarded for students who improve performance year over year as measured by STAAR progress measures and performance levels on STAAR reading and mathematics."
+http://tea4avcastro.tea.state.tx.us/A-F/domain-two-a-academic-growth.pdf
 
 ``` {r}
+# To find TEA scores, visit this site: https://tea.texas.gov/texas-schools/accountability/academic-accountability/performance-reporting/2022-accountability-rating-system
+
+# I used this specific file (statewide 2022 ratings): https://tea.texas.gov/sites/default/files/statewide_overall_accountability_ratings_2022.xlsx
 
 # I resaved the file as a csv instead of xlsx because the column name formats were giving me trouble 
 tea.score <- read.csv("statewide_overall_accountability_ratings_2022.csv") %>% 
@@ -680,73 +688,35 @@ tea.score <- read.csv("statewide_overall_accountability_ratings_2022.csv") %>%
 car.score <- district %>% 
   filter(tea.all.stud>=10000 & eco.dis.pct >= 60) %>% 
   mutate(district_sum = ((Pct.Lunch.Participation*0.25)+(Pct.Breakfast.Participation*0.5)+(cacfp_supper01*0.1)+(snack_anyafter*0.15))) %>% 
-  select(District.Number, district_sum) %>%
+  select(District.Number, district_sum, eco.dis.pct) %>%
   rename(car.score = district_sum)
 
 scores <- left_join(car.score, tea.score, by = "District.Number")
 
-ggplot(data = scores, aes(x=car.score, y = tea.progress)) +
-  geom_point() +
-  geom_smooth(method = lm)
-
-ggplot(data = scores, aes(x=car.score, y = tea.relative.performance)) +
-  geom_point() +
-  geom_smooth(method = lm)
-
-
-#BEST CORRELATION is with the tea growth score
+# TEA Growth Score
 ggplot(data = scores, aes(x=car.score, y = tea.growth)) +
   geom_point() +
   geom_smooth(method = lm)
 
-ggplot(data = scores, aes(x=car.score, y = tea.growth)) +
-  geom_point() +
-  geom_smooth()
+growth.model <- lm(car.score ~ tea.growth, data = scores)
 
-ggplot(data = scores, aes(x=car.score, y = tea.gap)) +
-  geom_point() +
-  geom_smooth(method = lm)
-
-
-ggplot(data = scores, aes(x=car.score, y = tea.achievement.score)) +
-  geom_point() +
-  geom_smooth(method = lm)
-
-ggplot(data = scores, aes(x=car.score, y = tea.overall.score)) +
-  geom_point() +
-  geom_smooth(method = lm)
-
-ggplot(data = scores, aes(x=car.score, y = tea.achievement.score)) +
-  geom_point() +
-  geom_smooth()
-
-ggplot(data = scores, aes(x=car.score, y = tea.overall.score)) +
-  geom_point() +
-  geom_smooth()
-
-
-car.school.rankings <- read_xlsx("Districts.xlsx") %>% 
-  rename(car.school.rankings = "Average of Total Score",
-         District = Districts)
-
-scores <- left_join(scores, car.school.rankings)
-
-ggplot(data = scores, aes(x=car.score, y = car.school.rankings)) +
-  geom_point() +
-  geom_smooth()
-
-ggplot(data = scores, aes(x=car.score, y = car.school.rankings)) +
-  geom_point() +
-  geom_smooth(method = lm)
-
-ggplot(data = scores, aes(x=car.score, y = car.school.rankings)) +
-  geom_point() +
-  geom_smooth(method = lm)
-
+# summary(growth.model)
+# Adjusted R-squared:  0.1173, p-value: 0.003044
 ```
 
-```{r}
 
+The strongest relationship was found with the percent of economically disadvantaged students.
+```{r}
+#BEST CORRELATION is with economically disadvantaged
+
+ggplot(car.score, aes(x=car.score, y = eco.dis.pct)) +
+  geom_point() +
+  geom_smooth(method = lm)
+
+eco.dis.model <- lm(car.score ~ eco.dis.pct, data = car.score)
+
+#summary(eco.dis.model)
+# Adjusted R-squared:  0.1789,  p-value: 0.0002642
 
 
 
