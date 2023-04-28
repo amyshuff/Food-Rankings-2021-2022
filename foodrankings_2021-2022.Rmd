@@ -656,3 +656,99 @@ ggplot(snp_longitudinal, aes(x=ProgramYear)) +
   labs(title = "Average Daily Participation by Site")
 
 ```
+# Comparison to School Performance
+
+https://tea.texas.gov/texas-schools/accountability/academic-accountability/performance-reporting/2022-accountability-rating-system
+
+
+A downloadable spreadsheet of statewide 2022 ratings and demographic information is available.
+
+https://tea.texas.gov/sites/default/files/statewide_overall_accountability_ratings_2022.xlsx
+
+``` {r}
+
+# I resaved the file as a csv instead of xlsx because the column name formats were giving me trouble 
+tea.score <- read.csv("statewide_overall_accountability_ratings_2022.csv") %>% 
+  filter(School.Type == "District") %>% 
+  mutate(tea.achievement.score = as.numeric(Student.Achievement.Score),
+         tea.overall.score = as.numeric(Overall.Score),
+         tea.growth = as.numeric(Academic.Growth.Score),
+         tea.relative.performance = as.numeric(Relative.Performance.Score),
+         tea.progress = as.numeric(School.Progress.Score),
+         tea.gap = as.numeric(Closing.the.Gaps.Score)) 
+
+car.score <- district %>% 
+  filter(tea.all.stud>=10000 & eco.dis.pct >= 60) %>% 
+  mutate(district_sum = ((Pct.Lunch.Participation*0.25)+(Pct.Breakfast.Participation*0.5)+(cacfp_supper01*0.1)+(snack_anyafter*0.15))) %>% 
+  select(District.Number, district_sum) %>%
+  rename(car.score = district_sum)
+
+scores <- left_join(car.score, tea.score, by = "District.Number")
+
+ggplot(data = scores, aes(x=car.score, y = tea.progress)) +
+  geom_point() +
+  geom_smooth(method = lm)
+
+ggplot(data = scores, aes(x=car.score, y = tea.relative.performance)) +
+  geom_point() +
+  geom_smooth(method = lm)
+
+
+#BEST CORRELATION is with the tea growth score
+ggplot(data = scores, aes(x=car.score, y = tea.growth)) +
+  geom_point() +
+  geom_smooth(method = lm)
+
+ggplot(data = scores, aes(x=car.score, y = tea.growth)) +
+  geom_point() +
+  geom_smooth()
+
+ggplot(data = scores, aes(x=car.score, y = tea.gap)) +
+  geom_point() +
+  geom_smooth(method = lm)
+
+
+ggplot(data = scores, aes(x=car.score, y = tea.achievement.score)) +
+  geom_point() +
+  geom_smooth(method = lm)
+
+ggplot(data = scores, aes(x=car.score, y = tea.overall.score)) +
+  geom_point() +
+  geom_smooth(method = lm)
+
+ggplot(data = scores, aes(x=car.score, y = tea.achievement.score)) +
+  geom_point() +
+  geom_smooth()
+
+ggplot(data = scores, aes(x=car.score, y = tea.overall.score)) +
+  geom_point() +
+  geom_smooth()
+
+
+car.school.rankings <- read_xlsx("Districts.xlsx") %>% 
+  rename(car.school.rankings = "Average of Total Score",
+         District = Districts)
+
+scores <- left_join(scores, car.school.rankings)
+
+ggplot(data = scores, aes(x=car.score, y = car.school.rankings)) +
+  geom_point() +
+  geom_smooth()
+
+ggplot(data = scores, aes(x=car.score, y = car.school.rankings)) +
+  geom_point() +
+  geom_smooth(method = lm)
+
+ggplot(data = scores, aes(x=car.score, y = car.school.rankings)) +
+  geom_point() +
+  geom_smooth(method = lm)
+
+```
+
+```{r}
+
+
+
+
+
+```
