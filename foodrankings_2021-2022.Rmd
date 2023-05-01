@@ -350,7 +350,7 @@ Our previous rankings found the percent of breakfast and lunch participation by 
 Credit for supper and snacks was given if any were offered by any site in the district at any point in the year.
 
 
-## Overall Rankings
+## State Rankings
 
 District scores were calculated as follows
 
@@ -487,32 +487,32 @@ kable(middleincomedistricts, caption="Top 5 Middle-income Districts", format.arg
 
 charter <- district_rankings %>% 
   filter(`School Type`== "Charter") %>% 
-  reshape::rename(c(Rank = "Overall Rank"))
+  reshape::rename(c(Rank = "State Rank"))
 
 kable(charter, caption="Charter School Districts", format.args=list(big.mark=","))
 
 ```
 </font>
 
-There are `r nrow(charter)` charter districts that meet our ranking criteria. `r first(charter$"District Name")` is the highest performing, ranked #`r min(charter$"Overall Rank")` overall.
+There are `r nrow(charter)` charter districts that meet our ranking criteria. `r first(charter$"District Name")` is the highest performing, ranked #`r min(charter$"State Rank")` in the state.
 
 \
 
 # Key Take-Aways
 
-All `r format(sum(tea$tea.all.stud, na.rm = T), big.mark=",")` students in Texas were offered free meals this year
+- All `r format(sum(tea$tea.all.stud, na.rm = T), big.mark=",")` students in Texas were offered free meals this year
 
 \
 
-The top ranking districts all had over `r min(topten$"% Lunch Participation")`% of their student population participating in lunch
+- The top ranking districts all had over `r min(topten$"% Lunch Participation")`% of their student population participating in lunch
 
 \
 
-Top 10 school districts overall: `r paste(topten$"District Name", collapse = ', ')` 
+- Top 10 school districts overall: `r paste(topten$"District Name", collapse = ', ')` 
 
-Top 5 large public school districts: `r paste(largedistricts$"District Name", collapse = ', ')`
+- Top 5 large public school districts: `r paste(largedistricts$"District Name", collapse = ', ')`
 
-Top 5 middle-income school districts: `r paste(middleincomedistricts$"District Name", collapse = ', ')`
+- Top 5 middle-income school districts: `r paste(middleincomedistricts$"District Name", collapse = ', ')`
 
 ``` {r, results='hide'} 
 
@@ -523,20 +523,110 @@ lunch <- district_rankings %>% arrange(-`% Lunch Participation`)
 
 \
 
-District with the highest lunch participation: `r first(lunch$"District Name")`, with `r max(district_rankings$"% Lunch Participation")`% of their total student population participating in lunch 
+- District with the highest lunch participation: `r first(lunch$"District Name")`, with `r max(district_rankings$"% Lunch Participation")`% of their total student population participating in lunch 
 
-District with the lowest lunch participation: `r last(lunch$"District Name")`, with `r min(district_rankings$"% Lunch Participation")`% of their total student population participating in lunch 
-
-\
-
-District with the highest breakfast participation: `r first(breakfast$"District Name")`, with `r max(district_rankings$"% Breakfast Participation")`% of their total student population participating in breakfast 
-
-District with the lowest breakfast participation: `r last(breakfast$"District Name")`, with `r min(district_rankings$"% Breakfast Participation")`% of their total student population participating in breakfast 
+- District with the lowest lunch participation: `r last(lunch$"District Name")`, with `r min(district_rankings$"% Lunch Participation")`% of their total student population participating in lunch 
 
 \
 
-`r format(mean(district$cacfp_supper01), digits = 3)`% of districts participate in the CACFP after-school meal program
+- District with the highest breakfast participation: `r first(breakfast$"District Name")`, with `r max(district_rankings$"% Breakfast Participation")`% of their total student population participating in breakfast 
 
+- District with the lowest breakfast participation: `r last(breakfast$"District Name")`, with `r min(district_rankings$"% Breakfast Participation")`% of their total student population participating in breakfast 
+
+\
+
+- `r format(mean(district$cacfp_supper01), digits = 3)`% of districts participate in the CACFP after-school meal program
+
+\
+
+# Regional Rankings
+
+Regionally-specific tables for press releases in Houston (Region 4), El Paso (Region 19), RGV (Region 1), and San Antonio (Region 20). 
+
+
+```{r, results='asis'}
+
+esc <- c(1, 4, 19, 20)
+
+for (region in esc){print(
+  kable(district_rankings %>% 
+      filter(`ESC Region`== region) %>% 
+      reshape::rename(c(Rank = "State Rank")) %>% 
+      mutate("Region Rank" = row_number(),  .before = "District Name") %>% 
+      filter(row_number() <= 3) %>% 
+      select("Region Rank", "State Rank", "District Name"), 
+      
+  caption = paste ("Top 3 Region", region, "School Districts"), 
+  format.args=list(big.mark=","),
+  format = "html", table.attr = "style='width:60%;'", align = "c")
+)
+  cat('\n')
+}
+
+```
+\
+
+# Comparison to School Performance
+
+I wanted to see if our food rankings score correlated with school performance. I looked at TEA's reported Overall Score, Student Achievement Score, Academic Growth Score, Relative Performance Score, School Progress Score, and Closing the Gaps Score. 
+
+Only the Academic Growth Score showed a positive correlation. 
+
+TEA Defines Academic Growth as: "Credit awarded for students who improve performance year over year as measured by STAAR progress measures and performance levels on STAAR reading and mathematics."
+http://tea4avcastro.tea.state.tx.us/A-F/domain-two-a-academic-growth.pdf
+
+``` {r}
+# To find TEA scores, visit this site: https://tea.texas.gov/texas-schools/accountability/academic-accountability/performance-reporting/2022-accountability-rating-system
+
+# I used this specific file (statewide 2022 ratings): https://tea.texas.gov/sites/default/files/statewide_overall_accountability_ratings_2022.xlsx
+
+# I resaved the file as a csv instead of xlsx because the column name formats were giving me trouble 
+tea.score <- read.csv("statewide_overall_accountability_ratings_2022.csv") %>% 
+  filter(School.Type == "District") %>% 
+  mutate(tea.achievement.score = as.numeric(Student.Achievement.Score),
+         tea.overall.score = as.numeric(Overall.Score),
+         tea.growth = as.numeric(Academic.Growth.Score),
+         tea.relative.performance = as.numeric(Relative.Performance.Score),
+         tea.progress = as.numeric(School.Progress.Score),
+         tea.gap = as.numeric(Closing.the.Gaps.Score)) 
+
+car.score <- district %>% 
+  filter(tea.all.stud>=10000 & eco.dis.pct >= 60) %>% 
+  mutate(district_sum = ((Pct.Lunch.Participation*0.25)+(Pct.Breakfast.Participation*0.5)+(cacfp_supper01*0.1)+(snack_anyafter*0.15))) %>% 
+  select(District.Number, district_sum, eco.dis.pct) %>%
+  rename(car.score = district_sum)
+
+scores <- left_join(car.score, tea.score, by = "District.Number")
+
+# TEA Growth Score
+ggplot(data = scores, aes(x=car.score, y = tea.growth)) +
+  geom_point() +
+  geom_smooth(method = lm)
+
+growth.model <- lm(car.score ~ tea.growth, data = scores)
+
+# summary(growth.model)
+# Adjusted R-squared:  0.1173, p-value: 0.003044
+```
+
+
+The strongest relationship was found with the percent of economically disadvantaged students.
+```{r}
+#BEST CORRELATION is with economically disadvantaged
+
+ggplot(car.score, aes(x=car.score, y = eco.dis.pct)) +
+  geom_point() +
+  geom_smooth(method = lm)
+
+eco.dis.model <- lm(car.score ~ eco.dis.pct, data = car.score)
+
+#summary(eco.dis.model)
+# Adjusted R-squared:  0.1789,  p-value: 0.0002642
+
+
+
+
+```
 
 
 \
@@ -661,64 +751,3 @@ ggplot(snp_longitudinal, aes(x=ProgramYear)) +
 ```
 \
 
-# Comparison to School Performance
-
-I wanted to see if our food rankings score correlated with school performance. I looked at TEA's reported Overall Score, Student Achievement Score, Academic Growth Score, Relative Performance Score, School Progress Score, and Closing the Gaps Score. 
-
-Only the Academic Growth Score showed a positive correlation. 
-
-TEA Defines Academic Growth as: "Credit awarded for students who improve performance year over year as measured by STAAR progress measures and performance levels on STAAR reading and mathematics."
-http://tea4avcastro.tea.state.tx.us/A-F/domain-two-a-academic-growth.pdf
-
-``` {r}
-# To find TEA scores, visit this site: https://tea.texas.gov/texas-schools/accountability/academic-accountability/performance-reporting/2022-accountability-rating-system
-
-# I used this specific file (statewide 2022 ratings): https://tea.texas.gov/sites/default/files/statewide_overall_accountability_ratings_2022.xlsx
-
-# I resaved the file as a csv instead of xlsx because the column name formats were giving me trouble 
-tea.score <- read.csv("statewide_overall_accountability_ratings_2022.csv") %>% 
-  filter(School.Type == "District") %>% 
-  mutate(tea.achievement.score = as.numeric(Student.Achievement.Score),
-         tea.overall.score = as.numeric(Overall.Score),
-         tea.growth = as.numeric(Academic.Growth.Score),
-         tea.relative.performance = as.numeric(Relative.Performance.Score),
-         tea.progress = as.numeric(School.Progress.Score),
-         tea.gap = as.numeric(Closing.the.Gaps.Score)) 
-
-car.score <- district %>% 
-  filter(tea.all.stud>=10000 & eco.dis.pct >= 60) %>% 
-  mutate(district_sum = ((Pct.Lunch.Participation*0.25)+(Pct.Breakfast.Participation*0.5)+(cacfp_supper01*0.1)+(snack_anyafter*0.15))) %>% 
-  select(District.Number, district_sum, eco.dis.pct) %>%
-  rename(car.score = district_sum)
-
-scores <- left_join(car.score, tea.score, by = "District.Number")
-
-# TEA Growth Score
-ggplot(data = scores, aes(x=car.score, y = tea.growth)) +
-  geom_point() +
-  geom_smooth(method = lm)
-
-growth.model <- lm(car.score ~ tea.growth, data = scores)
-
-# summary(growth.model)
-# Adjusted R-squared:  0.1173, p-value: 0.003044
-```
-
-
-The strongest relationship was found with the percent of economically disadvantaged students.
-```{r}
-#BEST CORRELATION is with economically disadvantaged
-
-ggplot(car.score, aes(x=car.score, y = eco.dis.pct)) +
-  geom_point() +
-  geom_smooth(method = lm)
-
-eco.dis.model <- lm(car.score ~ eco.dis.pct, data = car.score)
-
-#summary(eco.dis.model)
-# Adjusted R-squared:  0.1789,  p-value: 0.0002642
-
-
-
-
-```
