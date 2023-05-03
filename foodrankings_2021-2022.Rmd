@@ -570,12 +570,10 @@ for (region in esc){print(
 
 I wanted to see if our food rankings score correlated with school performance. I looked at TEA's reported Overall Score, Student Achievement Score, Academic Growth Score, Relative Performance Score, School Progress Score, and Closing the Gaps Score. 
 
-Only the Academic Growth Score showed a positive correlation. 
+Only the Academic Growth Score showed a positive correlation. But when I took out our filters (over 10,000 students and over 60% eco.dis) then the correlation was negative. I think it was just by chance that for these particular school districts there happened to be a positive correlation.
 
-TEA Defines Academic Growth as: "Credit awarded for students who improve performance year over year as measured by STAAR progress measures and performance levels on STAAR reading and mathematics."
-http://tea4avcastro.tea.state.tx.us/A-F/domain-two-a-academic-growth.pdf
 
-``` {r}
+```{r include=FALSE}
 # To find TEA scores, visit this site: https://tea.texas.gov/texas-schools/accountability/academic-accountability/performance-reporting/2022-accountability-rating-system
 
 # I used this specific file (statewide 2022 ratings): https://tea.texas.gov/sites/default/files/statewide_overall_accountability_ratings_2022.xlsx
@@ -593,7 +591,7 @@ tea.score <- read.csv("statewide_overall_accountability_ratings_2022.csv") %>%
 car.score <- district %>% 
   filter(tea.all.stud>=10000 & eco.dis.pct >= 60) %>% 
   mutate(district_sum = ((Pct.Lunch.Participation*0.25)+(Pct.Breakfast.Participation*0.5)+(cacfp_supper01*0.1)+(snack_anyafter*0.15))) %>% 
-  select(District.Number, district_sum, eco.dis.pct) %>%
+  select(District.Number, district_sum, eco.dis.pct, TypeOfOrg, ESC.Region, CEName) %>%
   rename(car.score = district_sum)
 
 scores <- left_join(car.score, tea.score, by = "District.Number")
@@ -601,20 +599,22 @@ scores <- left_join(car.score, tea.score, by = "District.Number")
 # TEA Growth Score
 ggplot(data = scores, aes(x=car.score, y = tea.growth)) +
   geom_point() +
-  geom_smooth(method = lm)
+  geom_smooth(method = lm) +
+  coord_cartesian(xlim = c(0, 100))
 
 growth.model <- lm(car.score ~ tea.growth, data = scores)
 
 # summary(growth.model)
 # Adjusted R-squared:  0.1173, p-value: 0.003044
+
+
 ```
 
 
-The strongest relationship was found with the percent of economically disadvantaged students.
-```{r}
-#BEST CORRELATION is with economically disadvantaged
+The strongest relationship was found with the percent of economically disadvantaged students. But once again this relationship disappears when I take out our filters (over 10,000 students and over 60% eco.dis).
 
-ggplot(car.score, aes(x=car.score, y = eco.dis.pct)) +
+```{r include=FALSE}
+ggplot(car.score, aes(x=car.score, y = eco.dis.pct, label = CEName)) +
   geom_point() +
   geom_smooth(method = lm)
 
@@ -622,12 +622,35 @@ eco.dis.model <- lm(car.score ~ eco.dis.pct, data = car.score)
 
 #summary(eco.dis.model)
 # Adjusted R-squared:  0.1789,  p-value: 0.0002642
+```
 
+This graph highlights just how poorly Kipp Schools and Yes Prep are doing at feeding their students. They are the only schools in our rankings that have an over 90% economically disadvantaged student population and still received a score under 50 from us. Less than half the students at Kipp Schools participate in their lunch program.
 
+```{r}
 
+ggplot(car.score, aes(x=car.score, y = eco.dis.pct, label = CEName)) +
+  geom_point(aes(color=TypeOfOrg)) +
+  geom_text(aes(label=ifelse(eco.dis.pct > 90 & car.score < 50, as.character(CEName),'')),hjust=0,vjust=0) +
+  theme_minimal()
 
 ```
 
+```{r eval=FALSE, include=FALSE}
+
+# Here I'm checking to see if the tea growth score is correlated with economically disadvantaged. The positive correlation could explain our score being correlated with the tea growth score (because they're both impacted by the eco.dis population.
+
+scores$'X..Economically.Disadvantaged' = gsub("%", "", scores$'X..Economically.Disadvantaged')
+
+scores <- scores %>% 
+  mutate(eco.dis = as.numeric(scores$X..Economically.Disadvantaged))
+
+
+ggplot(scores, aes(x = tea.growth, y = eco.dis)) +
+  geom_point() +
+  geom_smooth(method = lm)
+
+
+```
 
 \
 
