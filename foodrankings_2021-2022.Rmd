@@ -5,8 +5,6 @@ date: "`r Sys.Date()`"
 output:
   html_document:
     df_print: paged
-  word_document: default
-  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -17,6 +15,28 @@ knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 Our 2023 Food Rankings analyze data from the 2022 Program Year (2021-2022 data).
 
 The code used to create our rankings is available to the public on [github]( https://github.com/amyshuff/Food-Rankings-2021-2022).
+
+## Methodology Overview
+
+We only include districts that have at least 1,000 students and at least 60% economically disadvantaged student population.
+
+District scores were calculated as follows
+
+* 25% lunch participation percent
+
+* 50% breakfast participation percent
+
+* 10% serving supper
+
+* 15% serving after school snacks
+
+School Breakfast is weighted the highest in our analysis for various reasons: research suggests that providing the School Breakfast Program (SBP) can improve student attendance, increases their academic performance, and reduces discipline problems in the classroom. (Include citation) The struggle to obtain a nutritious breakfast particularly affects low-income households, but many families find that early morning schedules make it difficult to find time to prepare and eat a nutritious breakfast at home.
+
+Participation percents were found by combining all breakfast and lunch meals served by School Nutrition Program (SNP) and Seamless Summer Option (SSO) in each district, then dividing by the total number of students. Previous years rankings have used the number of students that qualified for free and reduced meals. Total enrollment was used this year since every student had access to free meals during the 2021-2022 school year. 
+
+Credit for serving supper or afterschool snacks was given to a district if they had at least one participating location. Supper data was from the Child and Adult Care Food Program (CACFP), and after school snacks were from any TDA program.
+
+Meal count data was supplied by the Texas Department of Agriculture (TDA). District enrollment numbers came from the Texas Education Agency (TEA).
 
 \
 
@@ -352,17 +372,7 @@ Credit for supper and snacks was given if any were offered by any site in the di
 
 ## State Rankings
 
-District scores were calculated as follows
 
-* 25% lunch participation percent
-
-* 50% breakfast participation percent
-
-* 10% serving supper
-
-* 15% serving after school snacks
-
-We only include districts that have at least 1,000 students and at least 60% economically disadvantaged student population.
 
 <font size="1">
 ``` {r}
@@ -402,6 +412,8 @@ kable(topten, caption="Top 10 Districts Overall", format.args=list(big.mark=",")
 
 ```
 </font>
+
+
 
 ## Large public districts
 Districts are considered large if they have at least 50,000 students. Public district here specifically means it is not a charter district.
@@ -543,7 +555,7 @@ lunch <- district_rankings %>% arrange(-`% Lunch Participation`)
 
 Regionally-specific tables for press releases in Houston (Region 4), El Paso (Region 19), RGV (Region 1), and San Antonio (Region 20). 
 
-
+<font size="1">
 ```{r, results='asis'}
 
 esc <- c(1, 4, 19, 20)
@@ -564,6 +576,8 @@ for (region in esc){print(
 }
 
 ```
+</font>
+
 \
 
 # Comparison to School Performance
