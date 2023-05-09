@@ -18,7 +18,7 @@ The code used to create our rankings is available to the public on [github]( htt
 
 ## Methodology Overview
 
-We only include districts that have at least 1,000 students and at least 60% economically disadvantaged student population.
+We only include districts that have at least 10,000 students and at least 60% economically disadvantaged student population.
 
 District scores were calculated as follows
 
